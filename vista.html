@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organigrama del Órgano Ejecutivo - DS 5675</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --line-color: #94a3b8;
+            --line-width: 2px;
+            --node-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --node-hover-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+
+        /* Contenedor principal del organigrama */
+        .org-chart-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            padding: 2rem 1rem 4rem 1rem;
+            display: block;
+            text-align: center;
+            /* Scrollbar styling */
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+            cursor: grab; /* Indicador de arrastre */
+        }
+        .org-chart-wrapper:active {
+            cursor: grabbing;
+        }
+
+        /* --- CSS CORE DEL ORGANIGRAMA CLÁSICO --- */
+        .org-tree {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0 auto;
+            min-width: max-content; /* Fuerza a mantener el ancho real y evitar desbordes rotos */
+        }
+
+        .org-tree ul {
+            padding-top: 20px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            margin: 0;
+            padding-left: 0;
+            list-style-type: none;
+        }
+
+        .org-tree li {
+            text-align: center;
+            position: relative;
+            padding: 20px 10px 0 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Líneas horizontales de conexión entre hermanos */
+        .org-tree li::before, .org-tree li::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 50%;
+            border-top: var(--line-width) solid var(--line-color);
+            width: 50%;
+            height: 20px;
+        }
+        .org-tree li::after {
+            right: auto;
+            left: 50%;
+            border-left: var(--line-width) solid var(--line-color);
+        }
+
+        /* Excepciones para las líneas horizontales */
+        .org-tree li:only-child::after, .org-tree li:only-child::before { display: none; }
+        .org-tree li:only-child { padding-top: 0; }
+        .org-tree li:first-child::before, .org-tree li:last-child::after { border: 0 none; }
+        .org-tree li:last-child::before { border-right: var(--line-width) solid var(--line-color); border-radius: 0 6px 0 0; }
+        .org-tree li:first-child::after { border-radius: 6px 0 0 0; }
+
+        /* Línea vertical descendente desde el padre */
+        .org-tree ul::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            border-left: var(--line-width) solid var(--line-color);
+            width: 0;
+            height: 20px;
+            transform: translateX(-50%);
+        }
+
+        /* Ocultar líneas del root */
+        .org-tree > ul { padding-top: 0; }
+        .org-tree > ul::before, .org-tree > ul > li::before, .org-tree > ul > li::after { display: none; }
+
+        /* --- CSS PARA EL APILAMIENTO VERTICAL (AHORRO DE ESPACIO) --- */
+        .org-tree ul.stacked {
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px; /* Espacio para la línea que baja del padre */
+            gap: 15px; /* Separación entre nodos apilados */
+        }
+        
+        .org-tree ul.stacked > li {
+            padding: 0;
+            margin: 0;
+            width: 100%;
+        }
+
+        /* Quitar las ramas horizontales de los nodos apilados */
+        .org-tree ul.stacked > li::before,
+        .org-tree ul.stacked > li::after {
+            display: none !important;
+        }
+
+        /* Dibujar la línea vertical que atraviesa y conecta los nodos apilados */
+        .org-tree ul.stacked > li:not(:last-child)::after {
+            content: '';
+            display: block !important;
+            position: absolute;
+            bottom: -15px; /* Cubre el 'gap' hasta el siguiente nodo */
+            left: 50%;
+            border-left: var(--line-width) solid var(--line-color);
+            width: 0;
+            height: 15px;
+            transform: translateX(-50%);
+        }
+
+        /* --- ESTILOS DE LAS CAJAS (NODOS) --- */
+        .org-node {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.4;
+            z-index: 10;
+            transition: all 0.2s ease;
+            width: max-content;
+            max-width: 180px;
+            min-width: 140px;
+            white-space: normal;
+            box-shadow: var(--node-shadow);
+            border: 1px solid rgba(0,0,0,0.05);
+            word-wrap: break-word;
+        }
+
+        .org-node:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--node-hover-shadow);
+            z-index: 20;
+        }
+
+        /* Paleta de Colores por Jerarquía */
+        .node-ministro { background: #0f172a; color: #ffffff; font-size: 15px; min-width: 220px; border-bottom: 4px solid #3b82f6; }
+        
+        /* Nivel 1: Ramas principales */
+        .node-apoyo-parent { background: #d97706; color: #ffffff; border-bottom: 3px solid #b45309; }
+        .node-vms-parent { background: #2563eb; color: #ffffff; border-bottom: 3px solid #1d4ed8; }
+        .node-entidad-parent { background: #0f766e; color: #ffffff; border-bottom: 3px solid #0f766e; }
+
+        /* Nivel 2 y 3: Subnodos */
+        .node-apoyo-item { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; font-size: 12px; font-weight: 500; }
+        
+        .node-viceministerio { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+        .node-direccion { background: #ffffff; color: #334155; border: 1px solid #cbd5e1; font-size: 12px; font-weight: 500; }
+        
+        .node-entidad-group { background: #ccfbf1; color: #115e59; border: 1px solid #5eead4; font-size: 12px; }
+        .node-entidad-item { background: #ffffff; color: #475569; border: 1px solid #e2e8f0; font-size: 11px; font-weight: 500; padding: 10px; }
+
+        /* Animaciones UI */
+        .accordion-content {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .accordion-content.active {
+            display: block;
+            opacity: 1;
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .chevron { transition: transform 0.3s ease; }
+        .chevron.rotated { transform: rotate(180deg); }
+
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b border-slate-200 pt-8 pb-6 px-4 mb-8">
+            <div class="max-w-5xl mx-auto text-center">
+                <div class="flex justify-center gap-2 mb-4">
+                    <div class="w-10 h-2.5 bg-red-600 rounded-full"></div>
+                    <div class="w-10 h-2.5 bg-yellow-400 rounded-full"></div>
+                    <div class="w-10 h-2.5 bg-green-600 rounded-full"></div>
+                </div>
+                <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-3">Estructura del Órgano Ejecutivo</h1>
+                <h2 class="text-lg md:text-xl font-medium text-slate-600 mb-6">Estado Plurinacional de Bolivia - DS N° 5675</h2>
+                
+                <div class="inline-flex bg-slate-100 p-1.5 rounded-lg border border-slate-200">
+                    <button id="btn-view-list" class="px-5 py-2 text-sm font-semibold rounded-md transition-all shadow-sm bg-white text-blue-700 ring-1 ring-slate-200/50">
+                        Vista de Lista Detallada
+                    </button>
+                    <button id="btn-view-chart" class="px-5 py-2 text-sm font-semibold rounded-md transition-all text-slate-600 hover:text-slate-900">
+                        Vista de Organigrama Gráfico
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            
+            <div class="max-w-3xl mx-auto mb-8 relative">
+                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                <input
+                    type="text"
+                    id="search-input"
+                    class="block w-full pl-12 pr-12 py-4 border-2 border-slate-200 rounded-xl leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 sm:text-base shadow-sm transition-all"
+                    placeholder="Buscar ministerios, viceministerios, entidades (Ej: YPFB, Deportes, Aduana)..."
+                />
+                <button id="btn-clear" class="hidden absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Contenedor dinámico de Ministerios -->
+            <div id="ministries-container" class="space-y-5 mb-16">
+                <!-- Se inyecta por JS -->
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 md:p-10 border border-slate-200 shadow-sm mb-12">
+                <div class="flex items-center gap-4 mb-8 border-b border-slate-100 pb-6">
+                    <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-bold text-slate-900">Modificaciones Institucionales Relevantes</h3>
+                        <p class="text-slate-500 mt-1">Disposiciones Adicionales y Transitorias - DS N° 5675</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="modifications-container">
+                    <!-- Se inyecta por JS -->
+                </div>
+            </div>
+
+        </main>
+        
+        <footer class="bg-slate-900 text-slate-400 py-8 text-center text-sm">
+            <p>Representación Interactiva Referencial. Fuente Oficial: DECRETO SUPREMO N° 5675</p>
+        </footer>
+    </div>
+
+    <script>
+        // --- BASE DE DATOS ESTRUCTURADA ---
+        const apoyoDirectoComun = [
+            "Jefatura de Gabinete",
+            "Unidad de Comunicación Institucional",
+            "Asesorías Especializadas (hasta 2)"
+        ];
+
+        const apoyoTransversalComun = [
+            "Dirección General de Planificación",
+            "Dirección General de Asuntos Administrativos",
+            "Dirección General de Asuntos Jurídicos",
+            "Unidad de Auditoría Interna",
+            "Unidad de Transparencia y Lucha Contra la Corrupción"
+        ];
+
+        const ministeriosData = [
+            {
+                id: 1, name: "Ministerio de Relaciones Exteriores",
+                apoyoTransversalExtra: ["Dirección General de Geopolítica y Geoeconomía", "Dirección General de la Academia Diplomática Plurinacional", "Dirección General de Escalafón y Gestión de Personal"],
+                desconcentradas: ["BOLIVIA EN EL MUNDO"],
+                descentralizadas: ["Orquesta Sinfónica Nacional", "CIAAAT (Tiwanaku)", "Agencia del Desarrollo del Cine y Audiovisual Bolivianos - ADECINE"],
+                viceministries: [
+                    { name: "Viceministerio de Relaciones Exteriores y Seguridad Transnacional", directorates: ["D.G. de Relaciones Bilaterales", "D.G. de Relaciones Multilaterales", "D.G. de Seguridad Transnacional", "D.G. de Ceremonial del Estado"] },
+                    { name: "Viceministerio de Comercio Exterior, Integración Económica e Inversiones Extranjeras", directorates: ["D.G. de Promoción de Exportaciones y Acuerdos", "D.G. de Promoción de Inversiones Extranjeras", "D.G. de Integración Económica"] },
+                    { name: "Viceministerio de Asuntos Jurídicos Internacionales y Gestión Consular", directorates: ["D.G. de Asuntos Jurídicos Internacionales", "D.G. de Asistencia y Protección Consular", "Dirección Departamental Santa Cruz", "Dirección Departamental Cochabamba"] },
+                    { name: "Viceministerio de Turismo Sostenible y Culturas", directorates: ["D.G. de Políticas y Desarrollo del Turismo Sostenible", "D.G. de Patrimonio, Folklore y Culturas", "D.G. de Desarrollo y Competitividad Gastronómica"] }
+                ]
+            },
+            {
+                id: 2, name: "Ministerio de la Presidencia",
+                desconcentradas: ["Gaceta Oficial de Bolivia", "Unidad de Análisis"],
+                descentralizadas: ["OFEP", "Servicio Estatal de Autonomías - SEA", "AGETIC", "SEPDEP", "DIRNOPLU", "SEPDAVI", "SEPMUD", "INRA", "ESIJ", "Despacho de Gestión Social", "Unidad de Comunicación Estratégica", "Observatorio Plurinacional de la Calidad Educativa"],
+                empresas: ["Bolivia TV", "Editorial del Estado"],
+                viceministries: [
+                    { name: "Viceministerio de Gestión Legislativa y Coord. Social", directorates: ["D.G. de Gestión y Seguimiento Legislativo", "D.G. de Coordinación con Organizaciones Sociales", "D.G. de Justicia Indígena", "D.G. de Protección a Naciones Indígenas"] },
+                    { name: "Viceministerio de Igualdad de Oportunidades", directorates: ["D.G. de Igualdad de Oportunidades", "D.G. de Lucha contra el Racismo", "D.G. Plurinacional de la Juventud"] },
+                    { name: "Viceministerio de Autonomías y Tierras", directorates: ["D.G. de Autonomías", "D.G. de Organización Territorial", "D.G. de Tierras y Proceso Agrario"] },
+                    { name: "Viceministerio de Coordinación, Planificación Estratégica y Modernización", directorates: ["D.G. de Desarrollo de Políticas Públicas", "D.G. de Seguimiento de la Gestión Pública", "D.G. de Modernización del Estado", "D.G. de Planificación Estratégica"] },
+                    { name: "Viceministerio de Transparencia, Seguridad Jurídica e Integridad", directorates: ["D.G. de Transparencia Institucional", "D.G. de Prevención y Seguridad Jurídica", "D.G. de Derechos Humanos"] }
+                ]
+            },
+            {
+                id: 3, name: "Ministerio de Economía y Finanzas Públicas",
+                desconcentradas: ["SENAPE", "SENASIR", "UCPP"],
+                descentralizadas: ["RUAT", "UIF", "INE", "UDAPE"],
+                autarquicas: ["Banco Central de Bolivia", "Aduana Nacional", "Servicio de Impuestos Nacionales"],
+                empresas: ["Depósitos Aduaneros Bolivianos", "Gestora Pública", "Administración de Servicios Portuarios"],
+                sociedades: ["Banco Unión S.A.", "Banco de Desarrollo Productivo BDP-S.A.M."],
+                viceministries: [
+                    { name: "Viceministerio de Presupuesto y Contabilidad Fiscal", directorates: ["D.G. de Programación Presupuestaria", "D.G. de Contabilidad Fiscal", "D.G. de Normas de Gestión Pública", "D.G. de Sistemas de Información Fiscal"] },
+                    { name: "Viceministerio de Política Tributaria", directorates: ["D.G. de Tributación Interna", "D.G. de Asuntos Arancelarios y Aduaneros", "D.G. de Estudios Tributarios"] },
+                    { name: "Viceministerio de Pensiones y Servicios Financieros", directorates: ["D.G. de Servicios Financieros", "D.G. de Pensiones"] },
+                    { name: "Viceministerio del Tesoro y Crédito Público", directorates: ["D.G. de Crédito Público", "D.G. de Programación del Tesoro", "D.G. de Estadísticas Fiscales"] },
+                    { name: "Viceministerio de Inversión Pública y Financiamiento Externo", directorates: ["D.G. de Programación y Preinversión", "D.G. de Gestión de Financiamiento Externo", "D.G. de Gestión de la Inversión Pública"] }
+                ]
+            },
+            {
+                id: 4, name: "Ministerio de Defensa",
+                apoyoTransversalExtra: ["Dirección General de Derechos Humanos e Interculturalidad en las FFAA"],
+                desconcentradas: ["Registro Internacional Boliviano de Buques - RIBB"],
+                descentralizadas: ["Escuela Militar de Ingeniería - EMI", "SEMENA", "SNHN", "SNAF", "SE-GEOMAP"],
+                empresas: ["Transportes Aéreos Bolivianos - TAB", "COFADENA", "ENABOL", "TAM", "Complejo Agroindustrial Buena Vista", "ESABOL"],
+                viceministries: [
+                    { name: "Viceministerio de Defensa y Cooperación al Desarrollo Integral", directorates: ["D.G. de Políticas de Defensa", "D.G. Territorial Militar", "D.G. de Logística", "D.G. de Bienes Patrimonio FFAA", "D.G. de Seguridad Aeroportuaria", "D.G. de Intereses Marítimos", "D.G. de Zonas de Seguridad Fronteriza"] },
+                    { name: "Viceministerio de Defensa Civil", directorates: ["D.G. de Emergencias y Auxilio", "D.G. de Prevención y Reconstrucción"] },
+                    { name: "Viceministerio de Lucha Contra el Contrabando", directorates: ["D.G. de Lucha Contra el Contrabando"] }
+                ]
+            },
+            {
+                id: 5, name: "Ministerio de Gobierno",
+                apoyoTransversalExtra: ["Dirección General de Régimen Penitenciario", "Centro Especial de Seguridad del Estado"],
+                desconcentradas: ["DIPREVCON", "DIGEMIG", "DIRCABI", "Observatorio Boliviano de Seguridad Ciudadana"],
+                descentralizadas: ["COVIPOL", "SEGIP", "MUSERPOL"],
+                viceministries: [
+                    { name: "Viceministerio de Régimen Interior, Fortalecimiento y Transparencia Policial", directorates: ["D.G. de Régimen Interior y Policía", "D.G. de la Oficina de Control Interno"] },
+                    { name: "Viceministerio de Lucha Integral Contra el Narcotráfico", directorates: ["D.G. de Defensa Social", "D.G. de Sustancias Controladas", "D.G. de la FELCN"] },
+                    { name: "Viceministerio de Seguridad Ciudadana y Prevención del Delito", directorates: ["D.G. de Seguridad Ciudadana", "D.G. de Lucha Contra la Trata y Tráfico"] }
+                ]
+            },
+            {
+                id: 6, name: "Ministerio de Trabajo",
+                viceministries: [
+                    { name: "Viceministerio de Empleo, Servicio Civil y Cooperativas", directorates: ["D.G. de Empleo y Productividad", "D.G. de Servicio Civil", "D.G. de Desarrollo de Cooperativas"] },
+                    { name: "Viceministerio de Trabajo y Gestión Sindical", directorates: ["D.G. de Trabajo y Seguridad Ocupacional", "D.G. de Gestión Sindical"] }
+                ]
+            },
+            {
+                id: 7, name: "Ministerio de Producción Sostenible, Medio Ambiente y Agua",
+                apoyoTransversalExtra: ["Dirección General del Centro de Investigaciones Sociocomunitarias - CIS"],
+                desconcentradas: ["SENAVEX", "SENAPI", "IBMETRO", "PRO-BOLIVIA", "SENASAG", "FONADIN", "IPD Soberanía Alimentaria", "IPD PACU", "UE-Pozos", "SERNAP", "UOB"],
+                descentralizadas: ["SEDEM", "INBOL", "ZOFRACOBIJA", "SENATEX", "SEPREC", "INIAF", "CIQ", "FDI", "SENAMHI", "FONABOSQUE", "SENASBA", "Museo de Historia Natural", "EMAGUA", "OTN Ríos Pilcomayo y Bermejo", "FNDR", "FONDESIF", "FPS"],
+                autarquicas: ["APMT", "INSA", "SENARI"],
+                empresas: ["EMAPA", "EASBA", "QUIPUS", "YACANA", "EBA", "Empresa Boliviana de Producción Agropecuaria", "Empresa Misicuni"],
+                viceministries: [
+                    { name: "Viceministerio de Políticas de Industrialización Sostenible y Artesanía", directorates: ["D.G. de Desarrollo Industrial", "D.G. de Servicios y Calidad", "D.G. de Análisis Productivo", "D.G. de Desarrollo de MYPES"] },
+                    { name: "Viceministerio de Medio Ambiente, Cambio Climático, Desarrollo Forestal y Biodiversidad", directorates: ["D.G. de Biodiversidad y Áreas Protegidas", "D.G. de Desarrollo Forestal", "D.G. de Medio Ambiente"] },
+                    { name: "Viceministerio de Desarrollo Agropecuario y Agroforestal", directorates: ["D.G. de Producción Agrícola", "D.G. de Producción Pecuaria y Acuicultura", "D.G. de Desarrollo Integral de Comunidades", "D.G. de Gestión Integral de Suelos"] },
+                    { name: "Viceministerio de Seguridad Hídrica, Agua, Saneamiento Básico y Riego", directorates: ["D.G. de Agua Potable", "D.G. de Gestión Integral de Residuos", "D.G. de Cuencas", "D.G. de Recursos Hídricos y Riego"] },
+                    { name: "Viceministerio de Comercio y Logística Interna, y Derechos del Usuario y Consumidor", directorates: ["D.G. de Comercio", "D.G. de Defensa de Derechos del Usuario", "D.G. de Desarrollo Logístico"] }
+                ]
+            },
+            {
+                id: 8, name: "Ministerio de Hidrocarburos y Energías",
+                desconcentradas: ["Ejecutora de Conversión a GNV"],
+                descentralizadas: ["Agencia Boliviana de Energía Nuclear - ABEN"],
+                empresas: ["YPFB", "ENDE", "EBIH", "YLB"],
+                viceministries: [
+                    { name: "Viceministerio de Desarrollo, Análisis Energético y Gestión Socioambiental", directorates: ["D.G. de Gestión Socioambiental", "D.G. de Análisis Energético"] },
+                    { name: "Viceministerio de Hidrocarburos", directorates: ["D.G. de Exploración y Explotación", "D.G. de Comercialización y Transporte", "D.G. de Industrialización y Refinación", "D.G. de Producción e Incentivos"] },
+                    { name: "Viceministerio de Electricidad y Energías Renovables", directorates: ["D.G. de Electricidad", "D.G. de Energías Renovables"] },
+                    { name: "Viceministerio de Recursos Evaporíticos y Tecnologías Energéticas Emergentes", directorates: ["D.G. de Recursos Evaporíticos", "D.G. de Tecnologías Energéticas Emergentes"] }
+                ]
+            },
+            {
+                id: 9, name: "Ministerio de Minería y Metalurgia",
+                descentralizadas: ["SENARECOM", "SERGEOMIN", "FOFIM"],
+                empresas: ["COMIBOL", "Empresa Siderúrgica del Mutún"],
+                viceministries: [
+                    { name: "Viceministerio de Política Minera, Regulación y Fiscalización", directorates: ["D.G. de Política Minera, Regulación y Fiscalización"] },
+                    { name: "Viceministerio de Desarrollo Productivo Minero Metalúrgico e Inversiones", directorates: ["D.G. de Inversiones y Minerales Críticos", "D.G. de Medio Ambiente y Consulta"] },
+                    { name: "Viceministerio de Cooperativas Mineras", directorates: ["D.G. de Cooperativas Mineras"] }
+                ]
+            },
+            {
+                id: 10, name: "Ministerio de Educación",
+                descentralizadas: ["EGPP", "Conservatorio Plurinacional de Música", "Academia Nacional de Ciencias", "Proyecto Sucre Ciudad Universitaria", "Escuela Boliviana Intercultural de Música", "IPELC", "Escuela Boliviana Intercultural de Danza", "UNIBOL Aymara", "UNIBOL Quechua", "UNIBOL Guaraní", "Universidad Pedagógica"],
+                viceministries: [
+                    { name: "Viceministerio de Educación Regular", directorates: ["D.G. de Educación Primaria", "D.G. de Educación Secundaria"] },
+                    { name: "Viceministerio de Educación Superior de Formación Profesional, Ciencia, Tecnología e Innovación", directorates: ["D.G. de Educación Superior Técnica y Tecnológica", "D.G. de Educación Superior Universitaria", "D.G. de Formación de Maestros", "D.G. de Ciencia, Tecnología e Innovación"] },
+                    { name: "Viceministerio de Educación Alternativa, Especial y Desarrollo del Talento Humano", directorates: ["D.G. de Educación Alternativa", "D.G. de Educación Especial", "D.G. de Postalfabetización"] }
+                ]
+            },
+            {
+                id: 11, name: "Ministerio de Salud y Deportes",
+                desconcentradas: ["CENETROP", "INLASA", "Escuela de Salud de La Paz", "Escuela de Salud Cochabamba", "AGEMED", "CONALPEDIS", "Fondo Nacional de Solidaridad y Equidad"],
+                descentralizadas: ["Instituto Boliviano de la Ceguera", "LONABOL", "CEASS", "INSO", "AISEM", "ASUSS", "Instituto Gastroenterológico del Bicentenario"],
+                viceministries: [
+                    { name: "Viceministerio de Gestión del Sistema Nacional de Salud", directorates: ["D.G. de Redes de Servicios de Salud", "D.G. de Gestión Hospitalaria", "D.G. del Sistema Nacional de Salud"] },
+                    { name: "Viceministerio de Promoción de la Salud, Epidemiología y Medicina Tradicional", directorates: ["D.G. de Promoción y Prevención", "D.G. de Medicina Tradicional", "D.G. de Epidemiología"] },
+                    { name: "Viceministerio de Deportes", directorates: ["D.G. de Deportes", "D.G. de Formación Deportiva"] }
+                ]
+            },
+            {
+                id: 12, name: "Ministerio de Obras Públicas, Servicios y Vivienda",
+                desconcentradas: ["Centro de Comunicaciones La Paz", "Terminal Terrestre Santa Cruz", "MI TREN", "UPRE"],
+                descentralizadas: ["Vías Bolivia", "ATT", "AEVIVIENDA", "Agencia Boliviana de Correos", "NAABOL"],
+                autarquicas: ["DGAC", "Administradora Boliviana de Carreteras - ABC"],
+                empresas: ["ENFE residual", "Boliviana de Aviación - BoA", "Agencia Boliviana Espacial", "Empresa Estratégica EBC", "Mi Teleférico", "ENTEL"],
+                viceministries: [
+                    { name: "Viceministerio de Transportes", directorates: ["D.G. de Transporte Terrestre, Fluvial y Lacustre", "D.G. de Transporte Aéreo"] },
+                    { name: "Viceministerio de Telecomunicaciones y TIC", directorates: ["D.G. de Telecomunicaciones", "D.G. de Servicios en Telecomunicaciones y TIC"] },
+                    { name: "Viceministerio de Vivienda y Urbanismo", directorates: ["D.G. de Vivienda y Urbanismo", "D.G. de Ordenamiento Urbano"] }
+                ]
+            }
+        ];
+
+        const modificacionesData = [
+            {
+                title: "Supresión de Carteras",
+                items: [
+                    "Se suprime el Ministerio de Planificación del Desarrollo y Medio Ambiente.",
+                    "Se suprime el Ministerio de Turismo Sostenible, Culturas, Folklore y Gastronomía."
+                ]
+            },
+            {
+                title: "Transferencias Institucionales",
+                items: [
+                    "Viceministerio de Ciencia y Tecnología pasa al Ministerio de Educación.",
+                    "Viceministerio de Planificación Estratégica pasa al Ministerio de la Presidencia.",
+                    "Viceministerio de Inversión Pública pasa al Ministerio de Economía y Finanzas Públicas.",
+                    "Viceministerio de Medio Ambiente pasa al Ministerio de Producción Sostenible.",
+                    "Competencias de Turismo y Culturas pasan al Ministerio de Relaciones Exteriores."
+                ]
+            },
+            {
+                title: "Cambios Adicionales",
+                items: [
+                    "Entidad 'CONOCE BOLIVIA' cambia de nombre a 'BOLIVIA EN EL MUNDO'.",
+                    "Fideicomisos del ex Ministerio de Planificación pasan a Producción Sostenible.",
+                    "La Autoridad de Impugnación Tributaria mantiene sus funciones."
+                ]
+            }
+        ];
+
+        // --- STREAMING_CHUNK:Lógica de Estado y Filtros... ---
+        let viewMode = 'list'; // 'list' o 'chart'
+        let searchTerm = '';
+        let expandedAccordionId = null;
+
+        const btnViewList = document.getElementById('btn-view-list');
+        const btnViewChart = document.getElementById('btn-view-chart');
+        const searchInput = document.getElementById('search-input');
+        const btnClear = document.getElementById('btn-clear');
+        const container = document.getElementById('ministries-container');
+        const modsContainer = document.getElementById('modifications-container');
+
+        const normalizeText = (text) => text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+        const getFilteredData = () => {
+            if (!searchTerm) return ministeriosData;
+            const term = normalizeText(searchTerm);
+
+            return ministeriosData.map(min => {
+                const matchName = normalizeText(min.name).includes(term);
+                
+                const filterArr = (arr) => (arr || []).filter(item => normalizeText(item).includes(term));
+                
+                const filteredVms = min.viceministries.map(vm => {
+                    const matchVm = normalizeText(vm.name).includes(term);
+                    const matchDirs = filterArr(vm.directorates);
+                    if (matchVm || matchDirs.length > 0) return { ...vm, directorates: matchVm && matchDirs.length === 0 ? vm.directorates : matchDirs };
+                    return null;
+                }).filter(Boolean);
+
+                const fExtra = filterArr(min.apoyoTransversalExtra);
+                const fDesc = filterArr(min.desconcentradas);
+                const fDescen = filterArr(min.descentralizadas);
+                const fAut = filterArr(min.autarquicas);
+                const fEmp = filterArr(min.empresas);
+                const fSoc = filterArr(min.sociedades);
+
+                if (matchName || filteredVms.length > 0 || fExtra.length > 0 || fDesc.length > 0 || fDescen.length > 0 || fAut.length > 0 || fEmp.length > 0 || fSoc.length > 0) {
+                    return {
+                        ...min,
+                        viceministries: matchName && filteredVms.length === 0 ? min.viceministries : filteredVms,
+                        apoyoTransversalExtra: matchName && fExtra.length === 0 ? min.apoyoTransversalExtra : fExtra,
+                        desconcentradas: matchName && fDesc.length === 0 ? min.desconcentradas : fDesc,
+                        descentralizadas: matchName && fDescen.length === 0 ? min.descentralizadas : fDescen,
+                        autarquicas: matchName && fAut.length === 0 ? min.autarquicas : fAut,
+                        empresas: matchName && fEmp.length === 0 ? min.empresas : fEmp,
+                        sociedades: matchName && fSoc.length === 0 ? min.sociedades : fSoc,
+                    };
+                }
+                return null;
+            }).filter(Boolean);
+        };
+
+        // --- STREAMING_CHUNK:Generadores de HTML (Vista Lista)... ---
+        const renderListItems = (items) => items.map(item => `<li class="text-sm text-slate-700 flex gap-2"><span class="text-slate-400">•</span> <span>${item}</span></li>`).join('');
+
+        const renderListView = (min) => {
+            const apoyoT = [...apoyoTransversalComun, ...(min.apoyoTransversalExtra || [])];
+            let html = `<div class="p-6 bg-slate-50"><div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">`;
+            
+            // Apoyo
+            html += `<div class="bg-white p-5 rounded-xl border border-amber-200 shadow-sm"><h4 class="font-bold text-amber-800 mb-3 text-sm uppercase">Apoyo Directo</h4><ul class="space-y-1.5">${renderListItems(apoyoDirectoComun)}</ul></div>`;
+            html += `<div class="bg-white p-5 rounded-xl border border-amber-200 shadow-sm"><h4 class="font-bold text-amber-800 mb-3 text-sm uppercase">Apoyo Transversal</h4><ul class="space-y-1.5">${renderListItems(apoyoT)}</ul></div>`;
+            html += `</div>`;
+
+            // VMS
+            html += `<h3 class="text-lg font-bold text-slate-800 mb-4 border-b border-slate-200 pb-2">Viceministerios y Direcciones</h3>`;
+            html += `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mb-8">`;
+            min.viceministries.forEach(vm => {
+                html += `<div class="bg-white p-5 rounded-xl border border-blue-200 shadow-sm"><h4 class="font-bold text-blue-800 mb-3 leading-tight">${vm.name}</h4><ul class="space-y-2">${vm.directorates.map(d => `<li class="text-xs text-slate-600 flex gap-1.5"><span class="text-blue-400 mt-0.5">-</span> <span class="leading-tight">${d}</span></li>`).join('')}</ul></div>`;
+            });
+            html += `</div>`;
+
+            // Entidades
+            const hasEntities = min.desconcentradas?.length || min.descentralizadas?.length || min.autarquicas?.length || min.empresas?.length || min.sociedades?.length;
+            if(hasEntities) {
+                html += `<h3 class="text-lg font-bold text-slate-800 mb-4 border-b border-slate-200 pb-2">Entidades Bajo Tuición / Sujeción</h3>`;
+                html += `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">`;
+                const renderEntGroup = (title, items) => items?.length ? `<div class="bg-white p-4 rounded-xl border border-teal-200 shadow-sm"><h4 class="font-bold text-teal-800 text-xs uppercase tracking-wide mb-3">${title}</h4><ul class="space-y-1.5">${items.map(i => `<li class="text-xs text-slate-600 flex gap-1.5"><span class="text-teal-400">•</span><span class="leading-tight">${i}</span></li>`).join('')}</ul></div>` : '';
+                html += renderEntGroup("Desconcentradas", min.desconcentradas);
+                html += renderEntGroup("Descentralizadas", min.descentralizadas);
+                html += renderEntGroup("Autárquicas", min.autarquicas);
+                html += renderEntGroup("Empresas Públicas", min.empresas);
+                html += renderEntGroup("Sociedades (Estado)", min.sociedades);
+                html += `</div>`;
+            }
+            html += `</div>`;
+            return html;
+        };
+
+        // --- STREAMING_CHUNK:Generadores de HTML (Vista Árbol Híbrido)... ---
+        const buildNode = (title, type) => `<div class="org-node node-${type}">${title}</div>`;
+        const buildStackedUl = (items, nodeType) => `<ul class="stacked">${items.map(item => `<li>${buildNode(item, nodeType)}</li>`).join('')}</ul>`;
+
+        const renderChartView = (min) => {
+            const apoyoT = [...apoyoTransversalComun, ...(min.apoyoTransversalExtra || [])];
+            
+            // 1. Rama Apoyo (Apilado)
+            let branchApoyo = `
+                <li>
+                    ${buildNode('Estructuras de Apoyo', 'apoyo-parent')}
+                    <ul class="stacked">
+                        <li>${buildNode('APOYO DIRECTO', 'apoyo-parent')}
+                            ${buildStackedUl(apoyoDirectoComun, 'apoyo-item')}
+                        </li>
+                        <li>${buildNode('APOYO TRANSVERSAL', 'apoyo-parent')}
+                            ${buildStackedUl(apoyoT, 'apoyo-item')}
+                        </li>
+                    </ul>
+                </li>
+            `;
+
+            // 2. Rama Viceministerios (Híbrido)
+            let vmsChildren = min.viceministries.map(vm => {
+                let dirs = vm.directorates.length ? buildStackedUl(vm.directorates, 'direccion') : '';
+                return `<li>${buildNode(vm.name, 'viceministerio')}${dirs}</li>`;
+            }).join('');
+            let branchVms = `<li>${buildNode('Viceministerios', 'vms-parent')}<ul>${vmsChildren}</ul></li>`;
+
+            // 3. Rama Entidades (Híbrido)
+            let entGroups = [];
+            if(min.desconcentradas?.length) entGroups.push({t: 'Desconcentradas', i: min.desconcentradas});
+            if(min.descentralizadas?.length) entGroups.push({t: 'Descentralizadas', i: min.descentralizadas});
+            if(min.autarquicas?.length) entGroups.push({t: 'Autárquicas', i: min.autarquicas});
+            if(min.empresas?.length) entGroups.push({t: 'Empresas Públicas', i: min.empresas});
+            if(min.sociedades?.length) entGroups.push({t: 'Sociedades Estado', i: min.sociedades});
+
+            let branchEnt = '';
+            if(entGroups.length > 0) {
+                let entChildren = entGroups.map(g => `<li>${buildNode(g.t, 'entidad-group')}${buildStackedUl(g.i, 'entidad-item')}</li>`).join('');
+                branchEnt = `<li>${buildNode('Entidades Relacionadas', 'entidad-parent')}<ul>${entChildren}</ul></li>`;
+            }
+
+            let rootTitle = `Ministra(o) de ${min.name.replace('Ministerio de ', '')}`;
+            
+            return `
+                <div class="org-chart-wrapper">
+                    <div class="org-tree">
+                        <ul>
+                            <li>
+                                ${buildNode(rootTitle, 'ministro')}
+                                <ul>
+                                    ${branchApoyo}
+                                    ${branchVms}
+                                    ${branchEnt}
+                                </ul>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+        };
+
+        // --- STREAMING_CHUNK:Controladores de Interfaz... ---
+        const renderData = () => {
+            const data = getFilteredData();
+            container.innerHTML = '';
+
+            if (data.length === 0) {
+                container.innerHTML = `<div class="text-center py-16 bg-white rounded-2xl border border-slate-200 text-slate-500">No se encontraron resultados.</div>`;
+                return;
+            }
+
+            data.forEach(min => {
+                const isExpanded = expandedAccordionId === min.id || searchTerm !== '';
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden';
+                
+                const header = document.createElement('button');
+                header.className = 'w-full px-6 py-5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors focus:outline-none';
+                header.onclick = () => {
+                    expandedAccordionId = isExpanded ? null : min.id;
+                    if(searchTerm) { searchTerm = ''; searchInput.value = ''; updateSearchUI(); }
+                    renderData();
+                };
+
+                header.innerHTML = `
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                        </div>
+                        <h2 class="text-lg md:text-xl font-bold text-slate-800">${min.name}</h2>
+                    </div>
+                    <svg class="w-6 h-6 text-slate-400 chevron ${isExpanded ? 'rotated' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                `;
+
+                const content = document.createElement('div');
+                content.className = `border-t border-slate-100 accordion-content ${isExpanded ? 'active' : ''}`;
+                
+                if (isExpanded) {
+                    content.innerHTML = viewMode === 'list' ? renderListView(min) : renderChartView(min);
+                }
+
+                card.appendChild(header);
+                card.appendChild(content);
+                container.appendChild(card);
+            });
+        };
+
+        const renderModifications = () => {
+            modsContainer.innerHTML = modificacionesData.map(mod => `
+                <div class="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                    <h4 class="font-bold text-slate-800 text-xs uppercase tracking-wider mb-4">${mod.title}</h4>
+                    <ul class="space-y-3">
+                        ${mod.items.map(item => `
+                            <li class="text-sm text-slate-600 flex items-start gap-2">
+                                <span class="text-blue-500 font-bold mt-0.5">•</span>
+                                <span class="leading-snug">${item}</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `).join('');
+        };
+
+        const updateViewButtons = () => {
+            const activeClass = "px-5 py-2 text-sm font-semibold rounded-md transition-all shadow-sm bg-white text-blue-700 ring-1 ring-slate-200/50";
+            const inactiveClass = "px-5 py-2 text-sm font-semibold rounded-md transition-all text-slate-600 hover:text-slate-900";
+            btnViewList.className = viewMode === 'list' ? activeClass : inactiveClass;
+            btnViewChart.className = viewMode === 'chart' ? activeClass : inactiveClass;
+            renderData();
+        };
+
+        const updateSearchUI = () => {
+            btnClear.classList.toggle('hidden', !searchTerm);
+        };
+
+        // --- STREAMING_CHUNK:Asignando Eventos... ---
+        btnViewList.addEventListener('click', () => { viewMode = 'list'; updateViewButtons(); });
+        btnViewChart.addEventListener('click', () => { viewMode = 'chart'; updateViewButtons(); });
+        
+        searchInput.addEventListener('input', (e) => {
+            searchTerm = e.target.value;
+            updateSearchUI();
+            renderData();
+        });
+
+        btnClear.addEventListener('click', () => {
+            searchTerm = '';
+            searchInput.value = '';
+            updateSearchUI();
+            renderData();
+        });
+
+        // Lógica para arrastrar el organigrama con el ratón (Drag to scroll)
+        let isDown = false;
+        let startX;
+        let scrollLeft;
+        let activeWrapper = null;
+
+        container.addEventListener('mousedown', (e) => {
+            const wrapper = e.target.closest('.org-chart-wrapper');
+            if (!wrapper) return;
+            isDown = true;
+            activeWrapper = wrapper;
+            startX = e.pageX - wrapper.offsetLeft;
+            scrollLeft = wrapper.scrollLeft;
+        });
+
+        container.addEventListener('mouseleave', () => { isDown = false; activeWrapper = null; });
+        container.addEventListener('mouseup', () => { isDown = false; activeWrapper = null; });
+
+        container.addEventListener('mousemove', (e) => {
+            if (!isDown || !activeWrapper) return;
+            e.preventDefault();
+            const x = e.pageX - activeWrapper.offsetLeft;
+            const walk = (x - startX) * 1.5; // Velocidad de arrastre
+            activeWrapper.scrollLeft = scrollLeft - walk;
+        });
+
+        // Init
+        renderModifications();
+        renderData();
+
+    </script>
+</body>
+</html>
