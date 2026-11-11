@@ -3,736 +3,1863 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Organigrama del Órgano Ejecutivo - DS 5675</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>Dashboard Ejecutivo - Decreto Supremo N° 5675</title>
     
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS (Excel Export/Import) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- PapaParse para Google Sheets -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        :root {
-            --line-color: #94a3b8;
-            --line-width: 2px;
-            --node-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            --node-hover-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f8fafc;
-            color: #1e293b;
-        }
-
-        /* Contenedor principal del organigrama */
-        .org-chart-wrapper {
-            width: 100%;
-            overflow-x: auto;
-            padding: 2rem 1rem 4rem 1rem;
-            display: block;
-            text-align: center;
-            /* Scrollbar styling */
-            scrollbar-width: thin;
-            scrollbar-color: #cbd5e1 transparent;
-            cursor: grab; /* Indicador de arrastre */
-        }
-        .org-chart-wrapper:active {
-            cursor: grabbing;
-        }
-
-        /* --- CSS CORE DEL ORGANIGRAMA CLÁSICO --- */
-        .org-tree {
-            display: inline-flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 0 auto;
-            min-width: max-content; /* Fuerza a mantener el ancho real y evitar desbordes rotos */
-        }
-
-        .org-tree ul {
-            padding-top: 20px;
-            position: relative;
-            display: flex;
-            justify-content: center;
-            margin: 0;
-            padding-left: 0;
-            list-style-type: none;
-        }
-
-        .org-tree li {
-            text-align: center;
-            position: relative;
-            padding: 20px 10px 0 10px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        /* Líneas horizontales de conexión entre hermanos */
-        .org-tree li::before, .org-tree li::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 50%;
-            border-top: var(--line-width) solid var(--line-color);
-            width: 50%;
-            height: 20px;
-        }
-        .org-tree li::after {
-            right: auto;
-            left: 50%;
-            border-left: var(--line-width) solid var(--line-color);
-        }
-
-        /* Excepciones para las líneas horizontales */
-        .org-tree li:only-child::after, .org-tree li:only-child::before { display: none; }
-        .org-tree li:only-child { padding-top: 0; }
-        .org-tree li:first-child::before, .org-tree li:last-child::after { border: 0 none; }
-        .org-tree li:last-child::before { border-right: var(--line-width) solid var(--line-color); border-radius: 0 6px 0 0; }
-        .org-tree li:first-child::after { border-radius: 6px 0 0 0; }
-
-        /* Línea vertical descendente desde el padre */
-        .org-tree ul::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 50%;
-            border-left: var(--line-width) solid var(--line-color);
-            width: 0;
-            height: 20px;
-            transform: translateX(-50%);
-        }
-
-        /* Ocultar líneas del root */
-        .org-tree > ul { padding-top: 0; }
-        .org-tree > ul::before, .org-tree > ul > li::before, .org-tree > ul > li::after { display: none; }
-
-        /* --- CSS PARA EL APILAMIENTO VERTICAL (AHORRO DE ESPACIO) --- */
-        .org-tree ul.stacked {
-            flex-direction: column;
-            align-items: center;
-            padding-top: 20px; /* Espacio para la línea que baja del padre */
-            gap: 15px; /* Separación entre nodos apilados */
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #0f172a; }
         
-        .org-tree ul.stacked > li {
-            padding: 0;
-            margin: 0;
-            width: 100%;
-        }
-
-        /* Quitar las ramas horizontales de los nodos apilados */
-        .org-tree ul.stacked > li::before,
-        .org-tree ul.stacked > li::after {
-            display: none !important;
-        }
-
-        /* Dibujar la línea vertical que atraviesa y conecta los nodos apilados */
-        .org-tree ul.stacked > li:not(:last-child)::after {
-            content: '';
-            display: block !important;
-            position: absolute;
-            bottom: -15px; /* Cubre el 'gap' hasta el siguiente nodo */
-            left: 50%;
-            border-left: var(--line-width) solid var(--line-color);
-            width: 0;
-            height: 15px;
-            transform: translateX(-50%);
-        }
-
-        /* --- ESTILOS DE LAS CAJAS (NODOS) --- */
-        .org-node {
-            position: relative;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 12px 16px;
-            border-radius: 10px;
-            font-size: 13px;
-            font-weight: 600;
-            line-height: 1.4;
-            z-index: 10;
-            transition: all 0.2s ease;
-            width: max-content;
-            max-width: 180px;
-            min-width: 140px;
-            white-space: normal;
-            box-shadow: var(--node-shadow);
-            border: 1px solid rgba(0,0,0,0.05);
-            word-wrap: break-word;
-        }
-
-        .org-node:hover {
-            transform: translateY(-3px);
-            box-shadow: var(--node-hover-shadow);
-            z-index: 20;
-        }
-
-        /* Paleta de Colores por Jerarquía */
-        .node-ministro { background: #0f172a; color: #ffffff; font-size: 15px; min-width: 220px; border-bottom: 4px solid #3b82f6; }
+        /* Pestañas de la Línea Gráfica */
+        .main-tab { border-bottom: 3px solid transparent; }
+        .main-tab.active { border-bottom: 3px solid #2563eb; color: #2563eb; font-weight: 700; }
         
-        /* Nivel 1: Ramas principales */
-        .node-apoyo-parent { background: #d97706; color: #ffffff; border-bottom: 3px solid #b45309; }
-        .node-vms-parent { background: #2563eb; color: #ffffff; border-bottom: 3px solid #1d4ed8; }
-        .node-entidad-parent { background: #0f766e; color: #ffffff; border-bottom: 3px solid #0f766e; }
-
-        /* Nivel 2 y 3: Subnodos */
-        .node-apoyo-item { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; font-size: 12px; font-weight: 500; }
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
-        .node-viceministerio { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
-        .node-direccion { background: #ffffff; color: #334155; border: 1px solid #cbd5e1; font-size: 12px; font-weight: 500; }
+        /* Animaciones */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes sweep { 0% {opacity: 0; margin-top: -10px} 100% {opacity: 1; margin-top: 0} }
         
-        .node-entidad-group { background: #ccfbf1; color: #115e59; border: 1px solid #5eead4; font-size: 12px; }
-        .node-entidad-item { background: #ffffff; color: #475569; border: 1px solid #e2e8f0; font-size: 11px; font-weight: 500; padding: 10px; }
-
-        /* Animaciones UI */
-        .accordion-content {
-            display: none;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        .accordion-content.active {
-            display: block;
-            opacity: 1;
-            animation: fadeIn 0.4s ease-out forwards;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .chevron { transition: transform 0.3s ease; }
-        .chevron.rotated { transform: rotate(180deg); }
-
+        .animate-fade { animation: fadeIn 0.3s ease forwards; }
+        .animate-slide { animation: slideUp 0.4s ease forwards; }
+        
+        /* Detalles y Sumarios Colapsables (Acordeones) */
+        details > summary { list-style: none; cursor: pointer; }
+        details > summary::-webkit-details-marker { display: none; }
+        details[open] > summary .fa-chevron-right { transform: rotate(90deg); }
+        details[open] summary ~ * { animation: sweep .3s ease-in-out; }
+        
+        .ministry-card { transition: all 0.3s ease; }
+        .ministry-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); }
     </style>
 </head>
-<body class="antialiased">
+<body class="min-h-screen flex flex-col pb-12 relative overflow-x-hidden">
 
-    <div class="min-h-screen">
-        <!-- Header -->
-        <header class="bg-white shadow-sm border-b border-slate-200 pt-8 pb-6 px-4 mb-8">
-            <div class="max-w-5xl mx-auto text-center">
-                <div class="flex justify-center gap-2 mb-4">
-                    <div class="w-10 h-2.5 bg-red-600 rounded-full"></div>
-                    <div class="w-10 h-2.5 bg-yellow-400 rounded-full"></div>
-                    <div class="w-10 h-2.5 bg-green-600 rounded-full"></div>
-                </div>
-                <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-3">Estructura del Órgano Ejecutivo</h1>
-                <h2 class="text-lg md:text-xl font-medium text-slate-600 mb-6">Estado Plurinacional de Bolivia - DS N° 5675</h2>
+    <!-- HEADER (Línea Gráfica Institucional) -->
+    <div class="w-full bg-[#1b4332] relative overflow-hidden shadow-md sticky top-0 z-40">
+        <!-- Elementos decorativos del fondo -->
+        <div class="absolute right-0 top-0 h-full w-1/3 opacity-20 pointer-events-none overflow-hidden hidden md:block">
+            <div class="absolute right-[-10%] top-[-50%] w-64 h-64 rounded-full border-[20px] border-[#2d6a4f]/40"></div>
+            <div class="absolute right-[5%] top-[-20%] w-96 h-96 rounded-full border-[40px] border-[#2d6a4f]/20"></div>
+        </div>
+        
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="pt-5 pb-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 justify-between">
                 
-                <div class="inline-flex bg-slate-100 p-1.5 rounded-lg border border-slate-200">
-                    <button id="btn-view-list" class="px-5 py-2 text-sm font-semibold rounded-md transition-all shadow-sm bg-white text-blue-700 ring-1 ring-slate-200/50">
-                        Vista de Lista Detallada
+                <!-- Logos y Título -->
+                <div class="flex items-center gap-3 shrink-0">
+                    <div class="bg-white rounded-xl p-2 h-16 w-auto flex items-center justify-center shadow-sm">
+                        <img src="cengoblogo.png" onerror="this.src='https://placehold.co/100x40/ffffff/1b4332?text=Logo+Estado'" alt="Logo Principal" class="max-h-full object-contain">
+                    </div>
+                    <div class="bg-white rounded-xl p-2 h-16 w-auto flex items-center justify-center shadow-sm">
+                        <img src="Logo1.jpeg" onerror="this.src='https://placehold.co/40x40/ffffff/1b4332?text=Escudo'" alt="Logo Secundario" class="max-h-full object-contain">
+                    </div>
+                    <div class="ml-2 mt-1 sm:mt-0">
+                        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight">
+                            <span class="text-white">Dashboard</span> <span class="text-amber-400">Ejecutivo</span>
+                        </h1>
+                        <p class="text-white/90 mt-1 text-xs sm:text-sm font-semibold tracking-wide">Estructura Órgano Ejecutivo (DS N° 5675)</p>
+                    </div>
+                </div>
+                
+                <!-- Acciones Rápidas (Excel) -->
+                <div class="flex items-center gap-3 w-full sm:w-auto mt-2 sm:mt-0">
+                    <button onclick="fetchFromGoogleSheets()" id="btn-sync" class="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors backdrop-blur-sm shadow-sm">
+                        <i class="fas fa-sync-alt"></i> Sincronizar Datos
                     </button>
-                    <button id="btn-view-chart" class="px-5 py-2 text-sm font-semibold rounded-md transition-all text-slate-600 hover:text-slate-900">
-                        Vista de Organigrama Gráfico
+                    <button onclick="exportarExcel()" class="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 border border-emerald-400 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm">
+                        <i class="fas fa-file-excel"></i> Descargar Excel
                     </button>
                 </div>
             </div>
-        </header>
-
-        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            
-            <div class="max-w-3xl mx-auto mb-8 relative">
-                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </div>
+        
+        <!-- Pestañas de Navegación -->
+        <div class="w-full bg-white border-b border-slate-200 shadow-inner">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex overflow-x-auto hide-scrollbar pt-3 gap-6" role="tablist">
+                    <button onclick="switchMainTab('dashboard')" id="tab-btn-dashboard" role="tab" aria-selected="true" class="main-tab active pb-3 px-1 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors whitespace-nowrap"><i class="fas fa-chart-pie mr-2"></i>Vista General</button>
+                    <button onclick="switchMainTab('resumen')" id="tab-btn-resumen" role="tab" aria-selected="false" class="main-tab pb-3 px-1 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors whitespace-nowrap"><i class="fas fa-id-badge mr-2"></i>Alta Gerencia (Min/Vice)</button>
+                    <button onclick="switchMainTab('estructura')" id="tab-btn-estructura" role="tab" aria-selected="false" class="main-tab pb-3 px-1 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors whitespace-nowrap"><i class="fas fa-sitemap mr-2"></i>Organigrama Jerárquico</button>
+                    <button onclick="switchMainTab('transversal')" id="tab-btn-transversal" role="tab" aria-selected="false" class="main-tab pb-3 px-1 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors whitespace-nowrap"><i class="fas fa-layer-group mr-2"></i>Estructura Común (Art. 95)</button>
                 </div>
-                <input
-                    type="text"
-                    id="search-input"
-                    class="block w-full pl-12 pr-12 py-4 border-2 border-slate-200 rounded-xl leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 sm:text-base shadow-sm transition-all"
-                    placeholder="Buscar ministerios, viceministerios, entidades (Ej: YPFB, Deportes, Aduana)..."
-                />
-                <button id="btn-clear" class="hidden absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        
+        <!-- Alerta de Sincronización Google Sheets -->
+        <div id="loading-banner" class="bg-blue-50 border border-blue-200 text-blue-800 rounded-2xl p-4 text-sm flex items-center shadow-sm mb-6 hidden">
+            <i class="fas fa-spinner fa-spin mr-3 text-lg text-blue-600"></i>
+            <span id="loading-text" class="font-medium">Sincronizando base de datos desde Google Sheets...</span>
+        </div>
+
+        <!-- Barra de Búsqueda Común -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div class="w-full md:w-1/2 relative">
+                <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                <input type="text" id="searchInput" placeholder="Buscar cartera de estado, autoridad, dirección, entidad..." class="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 transition-all">
+            </div>
+            <div class="text-xs text-slate-500 font-medium">
+                <i class="fas fa-info-circle mr-1"></i>
+                La búsqueda filtra en tiempo real el Dashboard y el Organigrama.
+            </div>
+        </div>
+
+        <!-- TAB 1: VISTA GENERAL (CARDS & KPIS) -->
+        <div id="view-dashboard" class="view-section animate-fade block" role="tabpanel">
+            <!-- KPIs -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center text-center">
+                    <div class="text-4xl font-black text-slate-800 mb-1">12</div>
+                    <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Ministerios</div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center text-center">
+                    <div class="text-4xl font-black text-blue-600 mb-1" id="kpi-viceministries">43</div>
+                    <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Viceministerios</div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center text-center">
+                    <div class="text-4xl font-black text-emerald-600 mb-1" id="kpi-entidades">0</div>
+                    <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Entidades / Empresas</div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-amber-200 bg-amber-50 flex flex-col items-center text-center">
+                    <div class="text-3xl font-black text-amber-600 mb-2 mt-1">N° 5675</div>
+                    <div class="text-[10px] font-bold uppercase tracking-widest text-amber-500">Decreto Supremo</div>
+                </div>
+            </div>
+
+            <!-- Grid de Ministerios -->
+            <h3 class="text-xl font-bold text-slate-800 mb-4">Directorio de Carteras de Estado</h3>
+            <div id="ministries-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-10">
+                <!-- Cards Inyectadas por JS -->
+            </div>
+        </div>
+
+        <!-- TAB 2: ORGANIGRAMA -->
+        <div id="view-estructura" class="view-section animate-fade hidden" role="tabpanel">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-10">
+                <div class="px-6 py-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center flex-wrap gap-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800">Estructura Jerárquica del Órgano Ejecutivo</h3>
+                        <p class="text-xs text-slate-500 mt-1">Visión de árbol desplegable de todas las carteras y entidades.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="toggleAllTrees(false)" class="text-xs bg-white border border-slate-200 text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-50 shadow-sm transition font-bold uppercase tracking-wider"><i class="fas fa-compress-alt mr-1"></i> Contraer</button>
+                        <button onclick="toggleAllTrees(true)" class="text-xs bg-blue-50 border border-blue-200 text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-100 shadow-sm transition font-bold uppercase tracking-wider"><i class="fas fa-expand-arrows-alt mr-1"></i> Expandir Todo</button>
+                    </div>
+                </div>
+                
+                <div class="p-6 overflow-x-auto">
+                    <!-- Árbol Vertical Interactivo -->
+                    <div class="w-full min-w-[600px]" id="org-interactive-tree">
+                        <!-- Inyectado por JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: ESTRUCTURA COMUN -->
+        <div id="view-transversal" class="view-section animate-fade hidden" role="tabpanel">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-10">
+                <div class="bg-[#1b4332] p-8 text-white text-center relative overflow-hidden">
+                    <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(circle at 2px 2px, white 1px, transparent 0); background-size: 24px 24px;"></div>
+                    <h3 class="text-3xl font-black mb-3 relative z-10"><i class="fas fa-layer-group mr-3 text-amber-400"></i>Estructura Común de Apoyo</h3>
+                    <p class="text-white/90 max-w-2xl mx-auto text-sm font-medium relative z-10">Todo Ministerio de Estado cuenta obligatoriamente con las siguientes direcciones y unidades transversales, prohibiéndose la duplicidad de sus funciones en otras áreas (Art. 95).</p>
+                </div>
+                
+                <div class="p-8 lg:p-12">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10 relative">
+                        <!-- Conector central visual (solo escritorio) -->
+                        <div class="hidden md:block absolute left-1/2 top-4 bottom-4 w-px bg-slate-200 transform -translate-x-1/2"></div>
+                        
+                        <div class="flex gap-5 animate-slide" style="animation-delay: 0.1s;">
+                            <div class="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-2xl shrink-0 z-10 shadow-sm border border-blue-100">
+                                <i class="fas fa-project-diagram"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-black text-slate-800 text-lg">Dirección General de Planificación</h4>
+                                <p class="text-sm text-slate-600 mt-2 leading-relaxed">Coordina procesos de planificación estratégica, sectorial y operativa. Verifica la correspondencia con el Plan de Desarrollo Económico y Social.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-5 animate-slide" style="animation-delay: 0.2s;">
+                            <div class="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-2xl shrink-0 z-10 shadow-sm border border-emerald-100">
+                                <i class="fas fa-file-invoice-dollar"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-black text-slate-800 text-lg">Dirección General de Asuntos Administrativos</h4>
+                                <p class="text-sm text-slate-600 mt-2 leading-relaxed">Gestión administrativa, financiera y de recursos humanos. Implementa sistemas de la Ley N° 1178. Administra infraestructura tecnológica.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-5 animate-slide" style="animation-delay: 0.3s;">
+                            <div class="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl shrink-0 z-10 shadow-sm border border-amber-100">
+                                <i class="fas fa-balance-scale"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-black text-slate-800 text-lg">Dirección General de Asuntos Jurídicos</h4>
+                                <p class="text-sm text-slate-600 mt-2 leading-relaxed">Asesoramiento jurídico especializado. Verifica legalidad de actos, elabora anteproyectos de ley y patrocina procesos judiciales.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-5 animate-slide" style="animation-delay: 0.4s;">
+                            <div class="w-14 h-14 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-2xl shrink-0 z-10 shadow-sm border border-purple-100">
+                                <i class="fas fa-search-dollar"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-black text-slate-800 text-lg">Unidad de Auditoría Interna</h4>
+                                <p class="text-sm text-slate-600 mt-2 leading-relaxed">Ejerce funciones con independencia de criterio sujeta a normas de auditoría gubernamental. Su dependencia de la MAE no autoriza interferencias.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-5 md:col-span-2 md:w-3/4 md:mx-auto mt-4 animate-slide" style="animation-delay: 0.5s;">
+                            <div class="w-14 h-14 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center text-2xl shrink-0 z-10 shadow-sm border border-red-100">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-black text-slate-800 text-lg">Unidad de Transparencia y Lucha Contra la Corrupción</h4>
+                                <p class="text-sm text-slate-600 mt-2 leading-relaxed">Promueve transparencia, acceso a información, ética, integridad y prevención de conflictos. Gestiona denuncias por actos de corrupción, velando por la rectitud en la gestión pública.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: RESUMEN ALTA GERENCIA -->
+        <div id="view-resumen" class="view-section animate-fade hidden" role="tabpanel">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-10">
+                <div class="px-6 py-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center flex-wrap gap-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800">Directorio de Alta Gerencia</h3>
+                        <p class="text-xs text-slate-500 mt-1">Vista simplificada enfocada exclusivamente en Ministros y Viceministros.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="toggleResumenTrees(false)" class="text-xs bg-white border border-slate-200 text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-50 shadow-sm transition font-bold uppercase tracking-wider"><i class="fas fa-compress-alt mr-1"></i> Contraer</button>
+                        <button onclick="toggleResumenTrees(true)" class="text-xs bg-blue-50 border border-blue-200 text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-100 shadow-sm transition font-bold uppercase tracking-wider"><i class="fas fa-expand-arrows-alt mr-1"></i> Expandir Todo</button>
+                    </div>
+                </div>
+                
+                <div class="p-6 bg-slate-100/50">
+                    <div id="resumen-container" class="space-y-4">
+                        <!-- Inyectado por JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MODAL RESUMEN MINISTERIO -->
+    <div id="summary-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[95vh] transform scale-95 transition-transform duration-300" id="summary-modal-content">
+            <!-- Header Modal Resumen -->
+            <div id="sm-header" class="px-6 py-4 flex justify-between items-center text-white transition-colors">
+                <div class="flex items-center gap-3">
+                    <div id="sm-icon" class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl backdrop-blur-md shadow-inner border border-white/10"></div>
+                    <span class="font-bold text-sm uppercase tracking-wider opacity-95">Resumen Institucional</span>
+                </div>
+                <button onclick="closeSummaryModal()" class="text-white/70 hover:text-white transition-colors bg-white/10 hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center backdrop-blur-md">
+                    <i class="fas fa-times"></i>
                 </button>
             </div>
-
-            <!-- Contenedor dinámico de Ministerios -->
-            <div id="ministries-container" class="space-y-5 mb-16">
-                <!-- Se inyecta por JS -->
-            </div>
-
-            <div class="bg-white rounded-2xl p-6 md:p-10 border border-slate-200 shadow-sm mb-12">
-                <div class="flex items-center gap-4 mb-8 border-b border-slate-100 pb-6">
-                    <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
-                        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+            
+            <!-- Cuerpo Modal Resumen -->
+            <div class="p-6 overflow-y-auto bg-slate-50 flex-1">
+                <div class="flex flex-col md:flex-row gap-6">
+                    
+                    <!-- Columna Izquierda: Ministro -->
+                    <div class="w-full md:w-1/3 flex flex-col items-center bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                        <div id="sm-photo" class="mb-4"></div>
+                        <h2 id="sm-ministry-name" class="text-xl font-black text-center text-slate-800 leading-tight mb-2">Ministerio</h2>
+                        <div class="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg uppercase tracking-widest text-center mb-4 border border-blue-100">Ministro/a de Estado</div>
+                        <div id="sm-name" class="text-lg font-black text-slate-700 text-center mb-4">Nombre Autoridad</div>
+                        <div class="w-full border-t border-slate-100 pt-4 mt-2">
+                            <div class="text-[10px] text-slate-400 font-bold uppercase mb-1.5 text-center">Contacto Institucional</div>
+                            <div id="sm-contact" class="text-xs font-semibold text-slate-600 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 w-full text-center truncate">
+                                contacto@gob.bo
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <h3 class="text-2xl font-bold text-slate-900">Modificaciones Institucionales Relevantes</h3>
-                        <p class="text-slate-500 mt-1">Disposiciones Adicionales y Transitorias - DS N° 5675</p>
+                    
+                    <!-- Columna Derecha: Estadísticas y Estructura -->
+                    <div class="w-full md:w-2/3 flex flex-col gap-6">
+                        <!-- KPIs -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-center transition-transform hover:-translate-y-1">
+                                <div id="sm-stat-vices" class="text-3xl font-black text-slate-800">0</div>
+                                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Viceministerios</div>
+                            </div>
+                            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-center transition-transform hover:-translate-y-1">
+                                <div id="sm-stat-dirs" class="text-3xl font-black text-blue-600">0</div>
+                                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Dir. Generales</div>
+                            </div>
+                            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-center transition-transform hover:-translate-y-1">
+                                <div id="sm-stat-extras" class="text-3xl font-black text-emerald-600">0</div>
+                                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Entidades</div>
+                            </div>
+                            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-center transition-transform hover:-translate-y-1">
+                                <div id="sm-stat-total" class="text-3xl font-black text-indigo-600">0</div>
+                                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Total Áreas</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Listas de Estructura -->
+                        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex-1">
+                            <h3 class="text-sm font-black text-slate-700 uppercase tracking-widest border-b border-slate-100 pb-2 mb-4"><i class="fas fa-network-wired mr-2 text-slate-400"></i>Estructura Organizacional</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded mb-3"><i class="fas fa-sitemap mr-1"></i> Viceministerios</h4>
+                                    <ul id="sm-list-vices" class="space-y-2 text-xs font-medium text-slate-600 pl-1"></ul>
+                                </div>
+                                <div class="space-y-6">
+                                    <div>
+                                        <h4 class="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded mb-3"><i class="fas fa-layer-group mr-1"></i> Estructura Común / Directa</h4>
+                                        <ul id="sm-list-extras" class="space-y-2 text-xs font-medium text-slate-600 pl-1"></ul>
+                                    </div>
+                                    <div id="sm-list-entidades-container">
+                                        <h4 class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded mb-3"><i class="fas fa-building mr-1"></i> Entidades y Empresas</h4>
+                                        <ul id="sm-list-entidades" class="space-y-2 text-xs font-medium text-slate-600 pl-1"></ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PERFIL JERÁRQUICO -->
+    <div id="perfil-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[95vh] transform scale-95 transition-transform duration-300" id="perfil-modal-content">
+            <!-- Header Modal -->
+            <div id="pm-header" class="px-6 py-4 flex justify-between items-center text-white transition-colors">
+                <div class="flex items-center gap-3">
+                    <div id="pm-icon" class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl backdrop-blur-md shadow-inner border border-white/10"></div>
+                    <span id="pm-ministry-name" class="font-bold text-sm uppercase tracking-wider opacity-95">Ministerio</span>
+                </div>
+                <button onclick="closeProfileModal()" class="text-white/70 hover:text-white transition-colors bg-white/10 hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center backdrop-blur-md">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <!-- Cuerpo Modal -->
+            <div class="p-6 overflow-y-auto bg-slate-50 flex-1">
+                <div class="flex flex-col lg:flex-row gap-8 mb-2">
+                    
+                    <!-- Columna Izquierda: Perfil -->
+                    <div class="flex flex-col items-center shrink-0 w-full lg:w-1/3">
+                        <div id="pm-photo" class="mb-5 relative"></div>
+                        <h2 id="pm-name" class="text-2xl font-black text-slate-800 text-center leading-tight mb-2">Nombre Autoridad</h2>
+                        <div id="pm-role" class="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg uppercase tracking-widest text-center mb-5 border border-blue-100">Cargo</div>
+                        
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 w-full shadow-sm">
+                            <div class="text-[10px] text-slate-400 font-bold uppercase mb-2 flex items-center justify-center"><i class="fas fa-address-card mr-1.5"></i> Datos de Contacto</div>
+                            <div id="pm-contact" class="text-sm font-semibold text-slate-700 break-all text-center flex items-center justify-center bg-slate-50 py-2 rounded-lg border border-slate-100">
+                                <i class="fas fa-envelope mr-2 text-slate-400"></i><span>contacto@gob.bo</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Columna Derecha: Jerarquía -->
+                    <div class="flex-1 w-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                        <div class="bg-slate-100/80 px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+                            <h3 class="text-xs font-black text-slate-600 uppercase tracking-widest"><i class="fas fa-sitemap mr-2 text-slate-400"></i>Relaciones Jerárquicas</h3>
+                        </div>
+                        <div class="p-6 flex-1 overflow-y-auto bg-slate-50/30 relative">
+                            <!-- Línea conectora central (visual) -->
+                            <div class="absolute left-1/2 top-6 bottom-6 w-0.5 bg-slate-200 transform -translate-x-1/2 z-0 hidden sm:block"></div>
+
+                            <!-- Superior -->
+                            <div id="pm-superior-container" class="mb-6 relative z-10">
+                                <div class="text-[10px] font-black text-slate-400 uppercase mb-2 text-center bg-slate-50 w-max mx-auto px-2">Reporta a (Superior)</div>
+                                <div id="pm-superior" class="max-w-sm mx-auto transition-transform hover:scale-[1.02]"></div>
+                            </div>
+                            
+                            <div class="flex justify-center mb-6 relative z-10 sm:hidden"><i class="fas fa-arrow-down text-slate-300"></i></div>
+                            
+                            <!-- Actual -->
+                            <div class="relative z-10 mb-6">
+                                <div class="text-[10px] font-black text-blue-500 uppercase mb-2 text-center bg-slate-50 w-max mx-auto px-2">Posición Actual</div>
+                                <div id="pm-current" class="max-w-md mx-auto shadow-md transform scale-105 ring-2 ring-blue-500/20 rounded-xl"></div>
+                            </div>
+
+                            <div id="pm-subordinates-arrow" class="flex justify-center mb-6 relative z-10 sm:hidden hidden"><i class="fas fa-arrow-down text-slate-300"></i></div>
+                            
+                            <!-- Subordinados -->
+                            <div id="pm-subordinates-container" class="relative z-10 hidden">
+                                <div class="text-[10px] font-black text-slate-400 uppercase mb-4 text-center bg-slate-50 w-max mx-auto px-2">Supervisa a (Subordinados)</div>
+                                <div id="pm-subordinates" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="modifications-container">
-                    <!-- Se inyecta por JS -->
-                </div>
             </div>
-
-        </main>
-        
-        <footer class="bg-slate-900 text-slate-400 py-8 text-center text-sm">
-            <p>Representación Interactiva Referencial. Fuente Oficial: DECRETO SUPREMO N° 5675</p>
-        </footer>
+        </div>
     </div>
 
     <script>
-        // --- BASE DE DATOS ESTRUCTURADA ---
-        const apoyoDirectoComun = [
-            "Jefatura de Gabinete",
-            "Unidad de Comunicación Institucional",
-            "Asesorías Especializadas (hasta 2)"
-        ];
-
-        const apoyoTransversalComun = [
-            "Dirección General de Planificación",
-            "Dirección General de Asuntos Administrativos",
-            "Dirección General de Asuntos Jurídicos",
-            "Unidad de Auditoría Interna",
-            "Unidad de Transparencia y Lucha Contra la Corrupción"
-        ];
-
-        const ministeriosData = [
+        // BASE DE DATOS ESTRUCTURA (DS N° 5675)
+        const baseMinisterios = [
             {
-                id: 1, name: "Ministerio de Relaciones Exteriores",
-                apoyoTransversalExtra: ["Dirección General de Geopolítica y Geoeconomía", "Dirección General de la Academia Diplomática Plurinacional", "Dirección General de Escalafón y Gestión de Personal"],
-                desconcentradas: ["BOLIVIA EN EL MUNDO"],
-                descentralizadas: ["Orquesta Sinfónica Nacional", "CIAAAT (Tiwanaku)", "Agencia del Desarrollo del Cine y Audiovisual Bolivianos - ADECINE"],
-                viceministries: [
-                    { name: "Viceministerio de Relaciones Exteriores y Seguridad Transnacional", directorates: ["D.G. de Relaciones Bilaterales", "D.G. de Relaciones Multilaterales", "D.G. de Seguridad Transnacional", "D.G. de Ceremonial del Estado"] },
-                    { name: "Viceministerio de Comercio Exterior, Integración Económica e Inversiones Extranjeras", directorates: ["D.G. de Promoción de Exportaciones y Acuerdos", "D.G. de Promoción de Inversiones Extranjeras", "D.G. de Integración Económica"] },
-                    { name: "Viceministerio de Asuntos Jurídicos Internacionales y Gestión Consular", directorates: ["D.G. de Asuntos Jurídicos Internacionales", "D.G. de Asistencia y Protección Consular", "Dirección Departamental Santa Cruz", "Dirección Departamental Cochabamba"] },
-                    { name: "Viceministerio de Turismo Sostenible y Culturas", directorates: ["D.G. de Políticas y Desarrollo del Turismo Sostenible", "D.G. de Patrimonio, Folklore y Culturas", "D.G. de Desarrollo y Competitividad Gastronómica"] }
+                id: 1, nombre: "Ministerio de Relaciones Exteriores", icono: "fa-globe-americas", color: "bg-blue-600", bgLight: "bg-blue-50", textColor: "text-blue-700",
+                desc: "Art. 29: Conduce la política exterior, relaciones internacionales, representación diplomática y promueve la cultura y turismo.",
+                viceministerios: [
+                    { nombre: "Viceministerio de Relaciones Exteriores y Seguridad Transnacional", desc: "Art. 30: Proponer y ejecutar la política exterior, diplomacia y seguridad internacional.", direcciones: [
+                        {nombre: "DG de Relaciones Bilaterales", desc: "Gestión de relaciones con otros Estados."}, {nombre: "DG de Relaciones Multilaterales", desc: "Gestión ante organismos internacionales."}, {nombre: "DG de Seguridad Transnacional", desc: "Gestión geopolítica y amenazas transnacionales."}, {nombre: "DG de Ceremonial del Estado Plurinacional de Bolivia", desc: "Protocolo de Estado."}
+                    ] },
+                    { nombre: "Viceministerio de Comercio Exterior, Integración Económica e Inversiones Extranjeras", desc: "Art. 31: Relaciones económicas, integración y promoción de exportaciones.", direcciones: [
+                        {nombre: "DG de Promoción de Exportaciones y Acuerdos Comerciales", desc: "Apertura de mercados."}, {nombre: "DG de Promoción de Inversiones Extranjeras", desc: "Atracción de capital extranjero."}, {nombre: "DG de Integración Económica", desc: "Mecanismos de integración regional."}
+                    ] },
+                    { nombre: "Viceministerio de Asuntos Jurídicos Internacionales y Gestión Consular", desc: "Art. 32: Asistencia jurídica internacional y protección consular.", direcciones: [
+                        {nombre: "DG de Asuntos Jurídicos Internacionales", desc: "Tratados y defensa jurídica."}, {nombre: "DG de Asistencia y Protección Consular", desc: "Servicio a connacionales en el exterior."}, {nombre: "Dirección Departamental Santa Cruz", desc: "Desconcentración regional."}, {nombre: "Dirección Departamental Cochabamba", desc: "Desconcentración regional."}
+                    ] },
+                    { nombre: "Viceministerio de Turismo Sostenible y Culturas", desc: "Art. 33: Promoción turística, patrimonio cultural y gastronomía.", direcciones: [
+                        {nombre: "DG de Políticas y Desarrollo del Turismo Sostenible", desc: "Gestión turística."}, {nombre: "DG de Patrimonio, Folklore y Culturas", desc: "Preservación cultural."}, {nombre: "DG de Desarrollo y Competitividad Gastronómica", desc: "Promoción culinaria."}
+                    ] }
+                ],
+                entidades: [
+                    { nombre: "BOLIVIA EN EL MUNDO", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Promoción internacional." },
+                    { nombre: "Orquesta Sinfónica Nacional", tipo: "Entidad Descentralizada bajo tuición", desc: "Fomento de la música y arte." },
+                    { nombre: "Centro de Investigaciones Arqueológicas y Adm. Tiwanaku (CIAAAT)", tipo: "Entidad Descentralizada bajo tuición", desc: "Gestión de patrimonio arqueológico." },
+                    { nombre: "Agencia del Desarrollo del Cine y Audiovisual (ADECINE)", tipo: "Entidad Descentralizada bajo tuición", desc: "Fomento audiovisual." }
+                ],
+                extra: [
+                    { nombre: "Dirección General de Geopolítica y Geoeconomía", desc: "Art. 28: Análisis estratégico global." },
+                    { nombre: "Dirección General de la Academia Diplomática Plurinacional", desc: "Art. 95 (Excepción): Formación diplomática." },
+                    { nombre: "Dirección General de Escalafón y Gestión de Personal", desc: "Art. 95 (Excepción): Gestión de carrera diplomática." }
                 ]
             },
             {
-                id: 2, name: "Ministerio de la Presidencia",
-                desconcentradas: ["Gaceta Oficial de Bolivia", "Unidad de Análisis"],
-                descentralizadas: ["OFEP", "Servicio Estatal de Autonomías - SEA", "AGETIC", "SEPDEP", "DIRNOPLU", "SEPDAVI", "SEPMUD", "INRA", "ESIJ", "Despacho de Gestión Social", "Unidad de Comunicación Estratégica", "Observatorio Plurinacional de la Calidad Educativa"],
-                empresas: ["Bolivia TV", "Editorial del Estado"],
-                viceministries: [
-                    { name: "Viceministerio de Gestión Legislativa y Coord. Social", directorates: ["D.G. de Gestión y Seguimiento Legislativo", "D.G. de Coordinación con Organizaciones Sociales", "D.G. de Justicia Indígena", "D.G. de Protección a Naciones Indígenas"] },
-                    { name: "Viceministerio de Igualdad de Oportunidades", directorates: ["D.G. de Igualdad de Oportunidades", "D.G. de Lucha contra el Racismo", "D.G. Plurinacional de la Juventud"] },
-                    { name: "Viceministerio de Autonomías y Tierras", directorates: ["D.G. de Autonomías", "D.G. de Organización Territorial", "D.G. de Tierras y Proceso Agrario"] },
-                    { name: "Viceministerio de Coordinación, Planificación Estratégica y Modernización", directorates: ["D.G. de Desarrollo de Políticas Públicas", "D.G. de Seguimiento de la Gestión Pública", "D.G. de Modernización del Estado", "D.G. de Planificación Estratégica"] },
-                    { name: "Viceministerio de Transparencia, Seguridad Jurídica e Integridad", directorates: ["D.G. de Transparencia Institucional", "D.G. de Prevención y Seguridad Jurídica", "D.G. de Derechos Humanos"] }
-                ]
+                id: 2, nombre: "Ministerio de la Presidencia", icono: "fa-university", color: "bg-slate-700", bgLight: "bg-slate-100", textColor: "text-slate-700",
+                desc: "Art. 35: Coordina la acción gubernamental, planificación estratégica y articulación con entidades autónomas.",
+                viceministerios: [
+                    { nombre: "Viceministerio de Gestión Legislativa y Coordinación con Org. Sociales", desc: "Art. 36: Articulación con la Asamblea Legislativa y sociedad civil.", direcciones: [
+                        {nombre: "DG de Gestión y Seguimiento Legislativo", desc: "Seguimiento de leyes."}, {nombre: "DG de Coordinación con Org. Sociales y Sociedad Civil", desc: "Prevención de conflictos."}, {nombre: "DG de Justicia Indígena Originario Campesina", desc: "Articulación jurisdiccional."}, {nombre: "DG de Protección a Naciones y Pueblos Indígena Originarios", desc: "Salvaguarda de derechos."}
+                    ] },
+                    { nombre: "Viceministerio de Igualdad de Oportunidades", desc: "Art. 37: Políticas de género, intergeneracionales y lucha contra discriminación.", direcciones: [
+                        {nombre: "DG de Igualdad de Oportunidades", desc: "Políticas de equidad."}, {nombre: "DG de Lucha contra el Racismo y Toda Forma de Discriminación", desc: "Descolonización."}, {nombre: "DG Plurinacional de la Juventud", desc: "Políticas de juventud."}
+                    ] },
+                    { nombre: "Viceministerio de Autonomías y Tierras", desc: "Art. 38: Organización territorial y régimen agrario.", direcciones: [
+                        {nombre: "DG de Autonomías", desc: "Descentralización."}, {nombre: "DG de Organización Territorial", desc: "Límites y áreas urbanas."}, {nombre: "DG de Tierras y Proceso Agrario", desc: "Gestión agraria."}
+                    ] },
+                    { nombre: "Viceministerio de Coordinación, Planificación Estratégica y Modernización del Estado", desc: "Art. 39: Seguimiento de resultados, gobierno digital y simplificación.", direcciones: [
+                        {nombre: "DG de Desarrollo de Políticas Públicas", desc: "Diseño de políticas."}, {nombre: "DG de Seguimiento de la Gestión Pública y de la Planificación Estatal", desc: "Monitoreo del PDES."}, {nombre: "DG de Modernización del Estado", desc: "Trámites y gobierno digital."}, {nombre: "DG de Planificación Estratégica", desc: "Prioridades gubernamentales."}
+                    ] },
+                    { nombre: "Viceministerio de Transparencia, Seguridad Jurídica e Integridad Pública", desc: "Art. 40: Prevención de corrupción y promoción de derechos humanos.", direcciones: [
+                        {nombre: "DG de Transparencia Institucional y Lucha contra la Corrupción", desc: "Investigación y prevención."}, {nombre: "DG de Prevención y Seguridad Jurídica", desc: "Acceso a la justicia."}, {nombre: "DG de Derechos Humanos", desc: "Cumplimiento de compromisos internacionales."}
+                    ] }
+                ],
+                entidades: [
+                    { nombre: "Gaceta Oficial de Bolivia", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Publicación de normativa." },
+                    { nombre: "Unidad de Análisis", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Análisis jurídico de proyectos." },
+                    { nombre: "Oficina Técnica para el Fortalecimiento de la Empresa Pública (OFEP)", tipo: "Entidad Descentralizada bajo tuición", desc: "Gestión de empresas estatales." },
+                    { nombre: "Servicio Estatal de Autonomías (SEA)", tipo: "Entidad Descentralizada bajo tuición", desc: "Asistencia en descentralización." },
+                    { nombre: "Agencia de Gobierno Electrónico y Tecnologías (AGETIC)", tipo: "Entidad Descentralizada bajo tuición", desc: "Desarrollo tecnológico." },
+                    { nombre: "Servicio Plurinacional de Defensa Pública (SEPDEP)", tipo: "Entidad Descentralizada bajo tuición", desc: "Defensa penal estatal." },
+                    { nombre: "Dirección del Notariado Plurinacional (DIRNOPLU)", tipo: "Entidad Descentralizada bajo tuición", desc: "Regulación notarial." },
+                    { nombre: "Servicio Plur. de Asistencia a la Víctima (SEPDAVI)", tipo: "Entidad Descentralizada bajo tuición", desc: "Apoyo a víctimas." },
+                    { nombre: "Servicio Plur. de la Mujer y Despatriarcalización (SEPMUD)", tipo: "Entidad Descentralizada bajo tuición", desc: "Políticas de género." },
+                    { nombre: "Instituto Nacional de Reforma Agraria (INRA)", tipo: "Entidad Descentralizada bajo tuición", desc: "Saneamiento de tierras." },
+                    { nombre: "Entidad de Servicios Integrales de Acceso a la Justicia (ESIJ)", tipo: "Entidad Descentralizada bajo tuición", desc: "Servicios judiciales." },
+                    { nombre: "Despacho de Gestión Social (DEGSE)", tipo: "Entidad Descentralizada bajo tuición", desc: "Apoyo humanitario." },
+                    { nombre: "Unidad de Comunicación Estratégica del Estado", tipo: "Entidad Descentralizada bajo tuición", desc: "Comunicación oficial." },
+                    { nombre: "Observatorio Plur. de la Calidad Educativa (OPCE)", tipo: "Entidad Descentralizada bajo tuición", desc: "Evaluación educativa." },
+                    { nombre: "Empresa Estatal de Televisión Bolivia TV", tipo: "Empresa bajo sujeción", desc: "Televisión estatal." },
+                    { nombre: "Editorial del Estado Plurinacional de Bolivia", tipo: "Empresa bajo sujeción", desc: "Servicios gráficos." }
+                ],
+                extra: []
             },
             {
-                id: 3, name: "Ministerio de Economía y Finanzas Públicas",
-                desconcentradas: ["SENAPE", "SENASIR", "UCPP"],
-                descentralizadas: ["RUAT", "UIF", "INE", "UDAPE"],
-                autarquicas: ["Banco Central de Bolivia", "Aduana Nacional", "Servicio de Impuestos Nacionales"],
-                empresas: ["Depósitos Aduaneros Bolivianos", "Gestora Pública", "Administración de Servicios Portuarios"],
-                sociedades: ["Banco Unión S.A.", "Banco de Desarrollo Productivo BDP-S.A.M."],
-                viceministries: [
-                    { name: "Viceministerio de Presupuesto y Contabilidad Fiscal", directorates: ["D.G. de Programación Presupuestaria", "D.G. de Contabilidad Fiscal", "D.G. de Normas de Gestión Pública", "D.G. de Sistemas de Información Fiscal"] },
-                    { name: "Viceministerio de Política Tributaria", directorates: ["D.G. de Tributación Interna", "D.G. de Asuntos Arancelarios y Aduaneros", "D.G. de Estudios Tributarios"] },
-                    { name: "Viceministerio de Pensiones y Servicios Financieros", directorates: ["D.G. de Servicios Financieros", "D.G. de Pensiones"] },
-                    { name: "Viceministerio del Tesoro y Crédito Público", directorates: ["D.G. de Crédito Público", "D.G. de Programación del Tesoro", "D.G. de Estadísticas Fiscales"] },
-                    { name: "Viceministerio de Inversión Pública y Financiamiento Externo", directorates: ["D.G. de Programación y Preinversión", "D.G. de Gestión de Financiamiento Externo", "D.G. de Gestión de la Inversión Pública"] }
-                ]
+                id: 3, nombre: "Ministerio de Economía y Finanzas Públicas", icono: "fa-chart-line", color: "bg-emerald-600", bgLight: "bg-emerald-50", textColor: "text-emerald-700",
+                desc: "Art. 42: Conduce la política macroeconómica, fiscal, tributaria y aduanera.",
+                viceministerios: [
+                    { nombre: "Viceministerio de Presupuesto y Contabilidad Fiscal", desc: "Art. 43: Elaboración del Presupuesto General del Estado (PGE).", direcciones: [
+                        {nombre: "DG de Programación y Gestión Presupuestaria", desc: "Elaboración del PGE."}, {nombre: "DG de Contabilidad Fiscal", desc: "Estados financieros del Estado."}, {nombre: "DG de Normas de Gestión Pública", desc: "Sistemas de Administración."}, {nombre: "DG de Sistemas de Gestión de Información Fiscal", desc: "SIGEP y otros."}
+                    ] },
+                    { nombre: "Viceministerio de Política Tributaria", desc: "Art. 44: Políticas impositivas y de recaudación.", direcciones: [
+                        {nombre: "DG de Tributación Interna", desc: "Régimen impositivo."}, {nombre: "DG de Asuntos Arancelarios y Defensa Comercial", desc: "Aduanas y salvaguardias."}, {nombre: "DG de Estudios Tributarios", desc: "Análisis fiscal."}
+                    ] },
+                    { nombre: "Viceministerio de Pensiones y Servicios Financieros", desc: "Art. 45: Seguridad Social de Largo Plazo y sistema financiero.", direcciones: [
+                        {nombre: "DG de Servicios Financieros", desc: "Regulación bancaria."}, {nombre: "DG de Pensiones", desc: "Sistema Integral de Pensiones."}
+                    ] },
+                    { nombre: "Viceministerio del Tesoro y Crédito Público", desc: "Art. 46: Gestión de la deuda y recursos del TGN.", direcciones: [
+                        {nombre: "DG de Crédito Público", desc: "Endeudamiento."}, {nombre: "DG de Programación y Operaciones del Tesoro", desc: "Flujo de caja fiscal."}, {nombre: "DG de Estadísticas Fiscales", desc: "Datos macroeconómicos."}
+                    ] },
+                    { nombre: "Viceministerio de Inversión Pública y Financiamiento Externo", desc: "Art. 47: Priorización de la inversión del Estado.", direcciones: [
+                        {nombre: "DG de Programación y Preinversión", desc: "Evaluación de proyectos."}, {nombre: "DG de Gestión de Financiamiento Externo", desc: "Deuda externa."}, {nombre: "DG de Gestión de la Inversión Pública", desc: "Monitoreo de ejecución."}
+                    ] }
+                ],
+                entidades: [
+                    { nombre: "Servicio Nacional de Patrimonio del Estado (SENAPE)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Bienes del Estado." },
+                    { nombre: "Servicio Nacional del Sistema de Reparto (SENASIR)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Pensiones de reparto." },
+                    { nombre: "Unidad de Coordinación de Programas y Proyectos (UCPP)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Ejecución de proyectos." },
+                    { nombre: "Registro Único para la Administración Tributaria Municipal (RUAT)", tipo: "Entidad Descentralizada bajo tuición", desc: "Vehículos e inmuebles." },
+                    { nombre: "Unidad de Investigaciones Financieras (UIF)", tipo: "Entidad Descentralizada bajo tuición", desc: "Lavado de dinero." },
+                    { nombre: "Instituto Nacional de Estadística (INE)", tipo: "Entidad Descentralizada bajo tuición", desc: "Datos oficiales." },
+                    { nombre: "Unidad de Análisis de Políticas Sociales y Económicas (UDAPE)", tipo: "Entidad Descentralizada bajo tuición", desc: "Análisis macro." },
+                    { nombre: "Banco Central de Bolivia (BCB)", tipo: "Entidad Autárquica bajo tuición", desc: "Política monetaria." },
+                    { nombre: "Aduana Nacional", tipo: "Entidad Autárquica bajo tuición", desc: "Control aduanero." },
+                    { nombre: "Servicio de Impuestos Nacionales (SIN)", tipo: "Entidad Autárquica bajo tuición", desc: "Recaudación fiscal." },
+                    { nombre: "Depósitos Aduaneros Bolivianos (DAB)", tipo: "Empresa Pública bajo sujeción sectorial", desc: "Almacenaje de carga." },
+                    { nombre: "Gestora Pública de la Seguridad Social de Largo Plazo", tipo: "Empresa Pública bajo sujeción sectorial", desc: "Fondos de pensiones." },
+                    { nombre: "Administración de Servicios Portuarios - Bolivia (ASP-B)", tipo: "Empresa Pública bajo sujeción sectorial", desc: "Logística portuaria." },
+                    { nombre: "Banco Unión S.A.", tipo: "Sociedad con participación accionaria", desc: "Banca pública." },
+                    { nombre: "Banco de Desarrollo Productivo (BDP-S.A.M.)", tipo: "Sociedad con participación accionaria", desc: "Banca de desarrollo." }
+                ],
+                extra: []
             },
             {
-                id: 4, name: "Ministerio de Defensa",
-                apoyoTransversalExtra: ["Dirección General de Derechos Humanos e Interculturalidad en las FFAA"],
-                desconcentradas: ["Registro Internacional Boliviano de Buques - RIBB"],
-                descentralizadas: ["Escuela Militar de Ingeniería - EMI", "SEMENA", "SNHN", "SNAF", "SE-GEOMAP"],
-                empresas: ["Transportes Aéreos Bolivianos - TAB", "COFADENA", "ENABOL", "TAM", "Complejo Agroindustrial Buena Vista", "ESABOL"],
-                viceministries: [
-                    { name: "Viceministerio de Defensa y Cooperación al Desarrollo Integral", directorates: ["D.G. de Políticas de Defensa", "D.G. Territorial Militar", "D.G. de Logística", "D.G. de Bienes Patrimonio FFAA", "D.G. de Seguridad Aeroportuaria", "D.G. de Intereses Marítimos", "D.G. de Zonas de Seguridad Fronteriza"] },
-                    { name: "Viceministerio de Defensa Civil", directorates: ["D.G. de Emergencias y Auxilio", "D.G. de Prevención y Reconstrucción"] },
-                    { name: "Viceministerio de Lucha Contra el Contrabando", directorates: ["D.G. de Lucha Contra el Contrabando"] }
-                ]
+                id: 4, nombre: "Ministerio de Defensa", icono: "fa-shield-alt", color: "bg-stone-600", bgLight: "bg-stone-100", textColor: "text-stone-700",
+                desc: "Art. 49: Política y estrategia de defensa, Fuerzas Armadas y gestión de riesgos.",
+                viceministerios: [
+                    { nombre: "Viceministerio de Defensa y Cooperación al Desarrollo Integral", desc: "Art. 50: Apoyo logístico, espacial y fronterizo.", direcciones: [
+                        {nombre: "DG Territorial Militar", desc: "Servicio militar y reservistas."}, {nombre: "DG de Políticas de Defensa", desc: "Estrategia nacional."}, {nombre: "DG de Logística", desc: "Aprovisionamiento militar."}, {nombre: "DG de Seguridad Nacional Aeroportuaria", desc: "Control de aeropuertos."}, {nombre: "DG de Bienes Patrimonio e Infraestructura", desc: "Bienes militares."}, {nombre: "DG de Zonas de Seguridad Fronteriza", desc: "Desarrollo en fronteras."}, {nombre: "DG de Intereses Marítimos", desc: "Política naviera."}
+                    ] },
+                    { nombre: "Viceministerio de Defensa Civil", desc: "Art. 51: Atención de desastres y emergencias.", direcciones: [
+                        {nombre: "DG de Emergencias y Auxilio", desc: "Respuesta ante desastres."}, {nombre: "DG de Prevención y Reconstrucción", desc: "Mitigación de riesgos."}
+                    ] },
+                    { nombre: "Viceministerio de Lucha Contra el Contrabando", desc: "Art. 52: Operaciones interinstitucionales en fronteras.", direcciones: [
+                        {nombre: "DG de Lucha Contra el Contrabando", desc: "Coordinación con FF.AA. y Aduana."}
+                    ] }
+                ],
+                entidades: [
+                    { nombre: "Registro Internacional Boliviano de Buques (RIBB)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Abanderamiento de naves." },
+                    { nombre: "Escuela Militar de Ingeniería (EMI)", tipo: "Entidad Descentralizada bajo tuición", desc: "Formación académica." },
+                    { nombre: "Servicio Nacional de Mejoramiento de Navegación Amazónica (SEMENA)", tipo: "Entidad Descentralizada bajo tuición", desc: "Hidrovías." },
+                    { nombre: "Servicio Nacional de Hidrografía Naval (SNHN)", tipo: "Entidad Descentralizada bajo tuición", desc: "Cartografía náutica." },
+                    { nombre: "Servicio Nacional de Aerofotogrametría (SNAF)", tipo: "Entidad Descentralizada bajo tuición", desc: "Levantamientos espaciales." },
+                    { nombre: "Servicio Geodésico de Mapas (SE-GEOMAP)", tipo: "Entidad Descentralizada bajo tuición", desc: "Cartografía terrestre." },
+                    { nombre: "Transportes Aéreos Bolivianos (TAB)", tipo: "Empresa Pública bajo tuición", desc: "Transporte de carga." },
+                    { nombre: "Corporación de las FF.AA. para el Desarrollo (COFADENA)", tipo: "Empresa Pública bajo tuición", desc: "Industria militar." },
+                    { nombre: "Empresa Naviera Boliviana (ENABOL)", tipo: "Empresa Pública bajo tuición", desc: "Servicios navieros." },
+                    { nombre: "Empresa Pública de Transporte Aéreo Militar (TAM)", tipo: "Empresa Pública bajo tuición", desc: "Aerolínea." },
+                    { nombre: "Complejo Agroindustrial Buena Vista", tipo: "Empresa Pública bajo tuición", desc: "Producción agrícola." },
+                    { nombre: "Empresa Servicios Aéreos Bolivianos (ESABOL)", tipo: "Empresa Pública bajo tuición", desc: "Mantenimiento aéreo." }
+                ],
+                extra: [{ nombre: "Dirección General de Derechos Humanos e Interculturalidad en las Fuerzas Armadas", desc: "Art. 48: Resguardo de garantías." }]
             },
             {
-                id: 5, name: "Ministerio de Gobierno",
-                apoyoTransversalExtra: ["Dirección General de Régimen Penitenciario", "Centro Especial de Seguridad del Estado"],
-                desconcentradas: ["DIPREVCON", "DIGEMIG", "DIRCABI", "Observatorio Boliviano de Seguridad Ciudadana"],
-                descentralizadas: ["COVIPOL", "SEGIP", "MUSERPOL"],
-                viceministries: [
-                    { name: "Viceministerio de Régimen Interior, Fortalecimiento y Transparencia Policial", directorates: ["D.G. de Régimen Interior y Policía", "D.G. de la Oficina de Control Interno"] },
-                    { name: "Viceministerio de Lucha Integral Contra el Narcotráfico", directorates: ["D.G. de Defensa Social", "D.G. de Sustancias Controladas", "D.G. de la FELCN"] },
-                    { name: "Viceministerio de Seguridad Ciudadana y Prevención del Delito", directorates: ["D.G. de Seguridad Ciudadana", "D.G. de Lucha Contra la Trata y Tráfico"] }
-                ]
+                id: 5, nombre: "Ministerio de Gobierno", icono: "fa-gavel", color: "bg-indigo-600", bgLight: "bg-indigo-50", textColor: "text-indigo-700",
+                desc: "Art. 54: Seguridad ciudadana, orden público, Policía Boliviana y régimen penitenciario.",
+                viceministerios: [
+                    { nombre: "Viceministerio de Régimen Interior, Fortalecimiento y Transparencia Policial", desc: "Art. 55: Seguridad interna y control policial.", direcciones: [
+                        {nombre: "DG de Régimen Interior", desc: "Paz social y order público."}, {nombre: "DG de la Oficina de Control Interno", desc: "Transparencia institucional."}
+                    ] },
+                    { nombre: "Viceministerio de Lucha Integral Contra el Narcotráfico", desc: "Art. 56: Fiscalización de sustancias y operaciones (FELCN).", direcciones: [
+                        {nombre: "DG de Defensa Social", desc: "Erradicación y prevención."}, {nombre: "DG de Sustancias Controladas", desc: "Control químico."}, {nombre: "DG de la FELCN", desc: "Interdicción al narcotráfico."}
+                    ] },
+                    { nombre: "Viceministerio de Seguridad Ciudadana y Prevención del Delito", desc: "Art. 57: Políticas de prevención criminal.", direcciones: [
+                        {nombre: "DG de Seguridad Ciudadana", desc: "Planes de prevención."}, {nombre: "DG de Lucha Contra la Trata y Tráfico", desc: "Combate a redes criminales."}
+                    ] }
+                ],
+                entidades: [
+                    { nombre: "Dirección de Apoyo (DIPREVCON)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Lucha contra el narcotráfico." },
+                    { nombre: "Dirección General de Migración (DIGEMIG)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Control fronterizo y extranjería." },
+                    { nombre: "Registro, Control y Adm. de Bienes Incautados (DIRCABI)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Bienes decomisados." },
+                    { nombre: "Observatorio Boliviano de Seguridad Ciudadana (OBSCD)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Estadísticas delictivas." },
+                    { nombre: "Consejo Nacional de Vivienda Policial (COVIPOL)", tipo: "Entidad Descentralizada bajo tuición", desc: "Vivienda policial." },
+                    { nombre: "Servicio General de Identificación Personal (SEGIP)", tipo: "Entidad Descentralizada bajo tuición", desc: "Emisión de cédulas." },
+                    { nombre: "Mutual de Servicios al Policía (MUSERPOL)", tipo: "Entidad Descentralizada bajo tuición", desc: "Prestaciones policiales." }
+                ],
+                extra: [{ nombre: "Dirección General de Régimen Penitenciario", desc: "Art. 53: Cárceles." }, { nombre: "Centro Especial de Seguridad del Estado", desc: "Inteligencia." }]
             },
             {
-                id: 6, name: "Ministerio de Trabajo",
-                viceministries: [
-                    { name: "Viceministerio de Empleo, Servicio Civil y Cooperativas", directorates: ["D.G. de Empleo y Productividad", "D.G. de Servicio Civil", "D.G. de Desarrollo de Cooperativas"] },
-                    { name: "Viceministerio de Trabajo y Gestión Sindical", directorates: ["D.G. de Trabajo y Seguridad Ocupacional", "D.G. de Gestión Sindical"] }
-                ]
+                id: 6, nombre: "Ministerio de Trabajo", icono: "fa-hard-hat", color: "bg-amber-600", bgLight: "bg-amber-50", textColor: "text-amber-700",
+                desc: "Art. 59: Políticas laborales, empleo, servicio civil y sector cooperativo.",
+                autoridad: "Williams José Bascope Laruta",
+                viceministerios: [
+                    { nombre: "Viceministerio de Empleo, Servicio Civil y Cooperativas", desc: "Art. 60: Productividad y administración pública.", direcciones: [
+                        {nombre: "DG de Empleo y Productividad Laboral", desc: "Fomento al empleo."}, {nombre: "DG de Servicio Civil", desc: "Carrera administrativa."}, {nombre: "DG de Desarrollo de Cooperativas", desc: "Fomento asociativo."}
+                    ] },
+                    { nombre: "Viceministerio de Trabajo y Gestión Sindical", desc: "Art. 61: Derechos laborales e higiene industrial.", direcciones: [
+                        {nombre: "DG de Trabajo, Higiene y Seguridad Ocupacional", desc: "Inspecciones laborales."}, {nombre: "DG de Gestión Sindical", desc: "Derechos de asociación."}
+                    ] }
+                ],
+                entidades: [],
+                extra: []
             },
             {
-                id: 7, name: "Ministerio de Producción Sostenible, Medio Ambiente y Agua",
-                apoyoTransversalExtra: ["Dirección General del Centro de Investigaciones Sociocomunitarias - CIS"],
-                desconcentradas: ["SENAVEX", "SENAPI", "IBMETRO", "PRO-BOLIVIA", "SENASAG", "FONADIN", "IPD Soberanía Alimentaria", "IPD PACU", "UE-Pozos", "SERNAP", "UOB"],
-                descentralizadas: ["SEDEM", "INBOL", "ZOFRACOBIJA", "SENATEX", "SEPREC", "INIAF", "CIQ", "FDI", "SENAMHI", "FONABOSQUE", "SENASBA", "Museo de Historia Natural", "EMAGUA", "OTN Ríos Pilcomayo y Bermejo", "FNDR", "FONDESIF", "FPS"],
-                autarquicas: ["APMT", "INSA", "SENARI"],
-                empresas: ["EMAPA", "EASBA", "QUIPUS", "YACANA", "EBA", "Empresa Boliviana de Producción Agropecuaria", "Empresa Misicuni"],
-                viceministries: [
-                    { name: "Viceministerio de Políticas de Industrialización Sostenible y Artesanía", directorates: ["D.G. de Desarrollo Industrial", "D.G. de Servicios y Calidad", "D.G. de Análisis Productivo", "D.G. de Desarrollo de MYPES"] },
-                    { name: "Viceministerio de Medio Ambiente, Cambio Climático, Desarrollo Forestal y Biodiversidad", directorates: ["D.G. de Biodiversidad y Áreas Protegidas", "D.G. de Desarrollo Forestal", "D.G. de Medio Ambiente"] },
-                    { name: "Viceministerio de Desarrollo Agropecuario y Agroforestal", directorates: ["D.G. de Producción Agrícola", "D.G. de Producción Pecuaria y Acuicultura", "D.G. de Desarrollo Integral de Comunidades", "D.G. de Gestión Integral de Suelos"] },
-                    { name: "Viceministerio de Seguridad Hídrica, Agua, Saneamiento Básico y Riego", directorates: ["D.G. de Agua Potable", "D.G. de Gestión Integral de Residuos", "D.G. de Cuencas", "D.G. de Recursos Hídricos y Riego"] },
-                    { name: "Viceministerio de Comercio y Logística Interna, y Derechos del Usuario y Consumidor", directorates: ["D.G. de Comercio", "D.G. de Defensa de Derechos del Usuario", "D.G. de Desarrollo Logístico"] }
-                ]
+                id: 7, nombre: "Ministerio de Producción Sostenible, Medio Ambiente y Agua", icono: "fa-leaf", color: "bg-green-600", bgLight: "bg-green-50", textColor: "text-green-700",
+                desc: "Art. 63: Promueve la industria, agropecuaria, medio ambiente, recursos hídricos y comercio interno.",
+                viceministerios: [
+                    { nombre: "Viceministerio de Políticas de Industrialización Sostenible y Artesanía", desc: "Art. 64: Desarrollo manufacturero y MYPES.", direcciones: [
+                        {nombre: "DG de Desarrollo Industrial", desc: "Parques industriales."}, {nombre: "DG de Servicios y Calidad", desc: "Normas técnicas."}, {nombre: "DG de Análisis Productivo", desc: "Inteligencia comercial."}, {nombre: "DG de Desarrollo de MYPES", desc: "Fomento artesanal."}
+                    ] },
+                    { nombre: "Viceministerio de Medio Ambiente, Cambio Climático, Desarrollo Forestal y Biodiversidad", desc: "Art. 65: Áreas protegidas y gestión climática.", direcciones: [
+                        {nombre: "DG de Biodiversidad y Áreas Protegidas", desc: "Gestión de flora y fauna."}, {nombre: "DG de Desarrollo Forestal", desc: "Manejo de bosques."}, {nombre: "DG de Medio Ambiente y Cambio Climático", desc: "Mitigación y adaptación."}
+                    ] },
+                    { nombre: "Viceministerio de Desarrollo Agropecuario y Agroforestal", desc: "Art. 66: Seguridad alimentaria e innovación agrícola.", direcciones: [
+                        {nombre: "DG de Producción Agrícola", desc: "Cultivos."}, {nombre: "DG de Producción Pecuaria", desc: "Ganadería y pesca."}, {nombre: "DG de Gestión Integral de Suelos", desc: "Uso de tierras."}, {nombre: "DG de Comunidades Productoras de Hoja de Coca", desc: "Desarrollo integral."}
+                    ] },
+                    { nombre: "Viceministerio de Seguridad Hídrica, Agua, Saneamiento Básico y Riego", desc: "Art. 67: Acceso a servicios y cuencas.", direcciones: [
+                        {nombre: "DG de Agua Potable y Saneamiento Básico", desc: "Cobertura de servicios."}, {nombre: "DG de Gestión Integral de Residuos", desc: "Economía circular."}, {nombre: "DG de Cuencas", desc: "Manejo hídrico."}, {nombre: "DG de Recursos Hídricos y Riego", desc: "Riego agrícola."}
+                    ] },
+                    { nombre: "Viceministerio de Comercio y Logística Interna, y Derechos del Usuario y Consumidor", desc: "Art. 68: Abastecimiento y defensa de competencia.", direcciones: [
+                        {nombre: "DG de Comercio", desc: "Regulación comercial."}, {nombre: "DG de Defensa de los Derechos de los Usuarios", desc: "Protección al consumidor."}, {nombre: "DG de Desarrollo Logístico", desc: "Cadenas de suministro."}
+                    ] }
+                ],
+                entidades: [
+                    { nombre: "Servicio Nacional de Verificación de Exportaciones (SENAVEX)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Certificados de origen." },
+                    { nombre: "Servicio Nacional de Propiedad Intelectual (SENAPI)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Patentes y marcas." },
+                    { nombre: "Instituto Boliviano de Metrología (IBMETRO)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Calidad y medidas." },
+                    { nombre: "PRO-BOLIVIA", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Fomento productivo." },
+                    { nombre: "Servicio Nacional de Sanidad Agropecuaria (SENASAG)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Inocuidad alimentaria." },
+                    { nombre: "Fondo Nacional de Desarrollo Integral (FONADIN)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Desarrollo alternativo." },
+                    { nombre: "Institución Pública SOBERANIA ALIMENTARIA", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Apoyo agrícola." },
+                    { nombre: "Inst. Pública de Pesca y Acuicultura (PACU)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Producción piscícola." },
+                    { nombre: "Unidad Ejecutora de Pozos (UE-Pozos)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Perforación de agua." },
+                    { nombre: "Servicio Nacional de Áreas Protegidas (SERNAP)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Reservas naturales." },
+                    { nombre: "Unidad Operativa Boliviana (UOB)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Apoyo territorial." },
+                    { nombre: "Servicio de Desarrollo de Empresas Públicas (SEDEM)", tipo: "Entidad Descentralizada bajo tuición", desc: "Incubadora de empresas." },
+                    { nombre: "Insumos Bolivia (INBOL)", tipo: "Entidad Descentralizada bajo tuición", desc: "Abastecimiento estatal." },
+                    { nombre: "Zona Franca Cobija (ZOFRACOBIJA)", tipo: "Entidad Descentralizada bajo tuición", desc: "Comercio fronterizo." },
+                    { nombre: "Servicio Nacional Textil (SENATEX)", tipo: "Entidad Descentralizada bajo tuición", desc: "Industria textil." },
+                    { nombre: "Servicio Plurinacional de Registro de Comercio (SEPREC)", tipo: "Entidad Descentralizada bajo tuición", desc: "Registro de empresas." },
+                    { nombre: "Instituto Nacional de Innovación Agropecuaria (INIAF)", tipo: "Entidad Descentralizada bajo tuición", desc: "Semillas e investigación." },
+                    { nombre: "Centro Internacional de la Quinua (CIQ)", tipo: "Entidad Descentralizada bajo tuición", desc: "Investigación quinua." },
+                    { nombre: "Fondo de Desarrollo Indígena (FDI)", tipo: "Entidad Descentralizada bajo tuición", desc: "Proyectos comunitarios." },
+                    { nombre: "Servicio Nacional de Meteorología e Hidrología (SENAMHI)", tipo: "Entidad Descentralizada bajo tuición", desc: "Clima y pronósticos." },
+                    { nombre: "Fondo Nacional de Desarrollo Forestal (FONABOSQUE)", tipo: "Entidad Descentralizada bajo tuición", desc: "Manejo maderable." },
+                    { nombre: "Sostenibilidad de Servicios en Saneamiento Básico (SENASBA)", tipo: "Entidad Descentralizada bajo tuición", desc: "Agua potable rural." },
+                    { nombre: "Museo Nacional de Historia Natural", tipo: "Entidad Descentralizada bajo tuición", desc: "Investigación natural." },
+                    { nombre: "Entidad Ejecutora de Medio Ambiente y Agua (EMAGUA)", tipo: "Entidad Descentralizada bajo tuición", desc: "Infraestructura de agua." },
+                    { nombre: "Oficina Técnica Ríos Pilcomayo y Bermejo", tipo: "Entidad Descentralizada bajo tuición", desc: "Cuencas transfronterizas." },
+                    { nombre: "Fondo Nacional de Desarrollo Regional (FNDR)", tipo: "Entidad Descentralizada bajo tuición", desc: "Fideicomisos subnacionales." },
+                    { nombre: "Fondo de Desarrollo Financiero (FONDESIF)", tipo: "Entidad Descentralizada bajo tuición", desc: "Apoyo financiero sectorial." },
+                    { nombre: "Fondo Nacional de Inversión Productiva y Social (FPS)", tipo: "Entidad Descentralizada bajo tuición", desc: "Obras civiles." },
+                    { nombre: "Autoridad Plurinacional de la Madre Tierra (APMT)", tipo: "Entidad Autárquica bajo tuición", desc: "Cambio climático." },
+                    { nombre: "Instituto del Seguro Agrario (INSA)", tipo: "Entidad Autárquica bajo tuición", desc: "Protección a cosechas." },
+                    { nombre: "Servicio Nacional de Riego (SENARI)", tipo: "Entidad Autárquica bajo tuición", desc: "Infraestructura de riego." },
+                    { nombre: "Empresa de Apoyo a la Prod. de Alimentos (EMAPA)", tipo: "Empresa Pública bajo sujeción sectorial", desc: "Silos y tiendas." },
+                    { nombre: "Empresa Azucarera San Buenaventura (EASBA)", tipo: "Empresa Pública bajo sujeción sectorial", desc: "Ingenio azucarero." },
+                    { nombre: "Empresa Pública QUIPUS", tipo: "Empresa Pública bajo sujeción sectorial", desc: "Ensamblaje tecnológico." },
+                    { nombre: "Empresa Pública YACANA", tipo: "Empresa Pública bajo sujeción sectorial", desc: "Hilos de camélidos." },
+                    { nombre: "Empresa Boliviana de Alimentos y Derivados (EBA)", tipo: "Empresa Pública bajo sujeción sectorial", desc: "Lácteos y derivados." },
+                    { nombre: "Empresa Boliviana de Producción Agropecuaria", tipo: "Empresa Pública bajo sujeción sectorial", desc: "Fomento rural." },
+                    { nombre: "Empresa Misicuni", tipo: "Empresa Pública bajo sujeción sectorial", desc: "Represa Múltiple." }
+                ],
+                extra: [{ nombre: "Dirección General del Centro de Investigaciones Sociocomunitarias (CIS)", desc: "Art. 62: Investigación y publicaciones." }]
             },
             {
-                id: 8, name: "Ministerio de Hidrocarburos y Energías",
-                desconcentradas: ["Ejecutora de Conversión a GNV"],
-                descentralizadas: ["Agencia Boliviana de Energía Nuclear - ABEN"],
-                empresas: ["YPFB", "ENDE", "EBIH", "YLB"],
-                viceministries: [
-                    { name: "Viceministerio de Desarrollo, Análisis Energético y Gestión Socioambiental", directorates: ["D.G. de Gestión Socioambiental", "D.G. de Análisis Energético"] },
-                    { name: "Viceministerio de Hidrocarburos", directorates: ["D.G. de Exploración y Explotación", "D.G. de Comercialización y Transporte", "D.G. de Industrialización y Refinación", "D.G. de Producción e Incentivos"] },
-                    { name: "Viceministerio de Electricidad y Energías Renovables", directorates: ["D.G. de Electricidad", "D.G. de Energías Renovables"] },
-                    { name: "Viceministerio de Recursos Evaporíticos y Tecnologías Energéticas Emergentes", directorates: ["D.G. de Recursos Evaporíticos", "D.G. de Tecnologías Energéticas Emergentes"] }
-                ]
+                id: 8, nombre: "Ministerio de Hidrocarburos y Energías", icono: "fa-bolt", color: "bg-orange-500", bgLight: "bg-orange-50", textColor: "text-orange-600",
+                desc: "Art. 70: Política hidrocarburífera, electricidad, energías renovables y evaporíticos.",
+                viceministerios: [
+                    { nombre: "Viceministerio de Planificación y Desarrollo Energético", desc: "Art. 71: Planeamiento a mediano y largo plazo.", direcciones: [
+                        {nombre: "DG de Gestión Socioambiental", desc: "Control ambiental energético."}, {nombre: "DG de Análisis Energético", desc: "Balance energético."}
+                    ] },
+                    { nombre: "Viceministerio de Hidrocarburos", desc: "Art. 72: Exploración, producción y masificación del gas.", direcciones: [
+                        {nombre: "DG de Exploración y Explotación", desc: "Upstream."}, {nombre: "DG de Comercialización y Transporte", desc: "Midstream y ductos."}, {nombre: "DG de Industrialización y Refinación", desc: "Petroquímica y refinerías."}, {nombre: "DG de Producción, Recaudación e Incentivos", desc: "Regalías y costos."}
+                    ] },
+                    { nombre: "Viceministerio de Electricidad y Energías Renovables", desc: "Art. 73: Generación eléctrica y transición energética.", direcciones: [
+                        {nombre: "DG de Electricidad", desc: "Sistema interconectado."}, {nombre: "DG de Energías Renovables", desc: "Proyectos alternativos."}
+                    ] },
+                    { nombre: "Viceministerio de Recursos Evaporíticos y Tecnologías Energéticas Emergentes", desc: "Art. 74: Industrialización del litio y energía nuclear.", direcciones: [
+                        {nombre: "DG de Recursos Evaporíticos", desc: "Cadena de baterías."}, {nombre: "DG de Tecnologías Energéticas Emergentes", desc: "Hidrógeno y nuclear."}
+                    ] }
+                ],
+                entidades: [
+                    { nombre: "Ejecutora de Conversión a Gas Natural (EEC-GNV)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Conversión de vehículos." },
+                    { nombre: "Agencia Boliviana de Energía Nuclear (ABEN)", tipo: "Entidad Descentralizada bajo tuición", desc: "Tecnología nuclear pacífica." },
+                    { nombre: "Yacimientos Petrolíferos Fiscales Bolivianos (YPFB)", tipo: "Empresas Corporativas, Filiales y Subsidiarias bajo sujeción sectorial", desc: "Corporación petrolera." },
+                    { nombre: "Empresa Nacional de Electricidad (ENDE)", tipo: "Empresas Corporativas, Filiales y Subsidiarias bajo sujeción sectorial", desc: "Corporación eléctrica." },
+                    { nombre: "Empresa Boliviana de Industrialización (EBIH)", tipo: "Empresas Corporativas, Filiales y Subsidiarias bajo sujeción sectorial", desc: "Tuberías y petroquímica." },
+                    { nombre: "Yacimientos de Litio Bolivianos (YLB)", tipo: "Empresas Corporativas, Filiales y Subsidiarias bajo sujeción sectorial", desc: "Extracción e industria de sales." }
+                ],
+                extra: []
             },
             {
-                id: 9, name: "Ministerio de Minería y Metalurgia",
-                descentralizadas: ["SENARECOM", "SERGEOMIN", "FOFIM"],
-                empresas: ["COMIBOL", "Empresa Siderúrgica del Mutún"],
-                viceministries: [
-                    { name: "Viceministerio de Política Minera, Regulación y Fiscalización", directorates: ["D.G. de Política Minera, Regulación y Fiscalización"] },
-                    { name: "Viceministerio de Desarrollo Productivo Minero Metalúrgico e Inversiones", directorates: ["D.G. de Inversiones y Minerales Críticos", "D.G. de Medio Ambiente y Consulta"] },
-                    { name: "Viceministerio de Cooperativas Mineras", directorates: ["D.G. de Cooperativas Mineras"] }
-                ]
+                id: 9, nombre: "Ministerio de Minería y Metalurgia", icono: "fa-gem", color: "bg-zinc-500", bgLight: "bg-zinc-100", textColor: "text-zinc-600",
+                desc: "Art. 76: Desarrollo minero, regulación, industrialización y minerales estratégicos.",
+                viceministerios: [
+                    { nombre: "Viceministerio de Política Minera, Regulación y Fiscalización", desc: "Art. 77: Normas y control sobre contratos mineros.", direcciones: [
+                        {nombre: "DG de Política Minera, Regulación y Fiscalización", desc: "Cotizaciones oficiales y regalías."}
+                    ] },
+                    { nombre: "Viceministerio de Desarrollo Productivo Minero Metalúrgico e Inversiones", desc: "Art. 78: Minerales estratégicos, críticos y medio ambiente.", direcciones: [
+                        {nombre: "DG de Inversiones, Minerales Estratégicos y Críticos", desc: "Atracción de capital."}, {nombre: "DG de Medio Ambiente y Consulta", desc: "Consulta previa."}
+                    ] },
+                    { nombre: "Viceministerio de Cooperativas Mineras", desc: "Art. 79: Fomento a la minería social y artesanal.", direcciones: [
+                        {nombre: "DG de Cooperativas Mineras", desc: "Apoyo técnico e industrial."}
+                    ] }
+                ],
+                entidades: [
+                    { nombre: "Servicio Nacional de Comercialización (SENARECOM)", tipo: "Entidad Descentralizada bajo tuición", desc: "Control de exportación minera." },
+                    { nombre: "Servicio Geológico Minero (SERGEOMIN)", tipo: "Entidad Descentralizada bajo tuición", desc: "Exploración geológica." },
+                    { nombre: "Fondo de Financiamiento para la Minería (FOFIM)", tipo: "Entidad Descentralizada bajo tuición", desc: "Crédito a cooperativas." },
+                    { nombre: "Corporación Minera de Bolivia (COMIBOL)", tipo: "Empresa Pública bajo tuición", desc: "Holding minero estatal." },
+                    { nombre: "Empresa Siderúrgica del Mutún (ESM)", tipo: "Empresa Pública bajo tuición", desc: "Complejo de acero." }
+                ],
+                extra: []
             },
             {
-                id: 10, name: "Ministerio de Educación",
-                descentralizadas: ["EGPP", "Conservatorio Plurinacional de Música", "Academia Nacional de Ciencias", "Proyecto Sucre Ciudad Universitaria", "Escuela Boliviana Intercultural de Música", "IPELC", "Escuela Boliviana Intercultural de Danza", "UNIBOL Aymara", "UNIBOL Quechua", "UNIBOL Guaraní", "Universidad Pedagógica"],
-                viceministries: [
-                    { name: "Viceministerio de Educación Regular", directorates: ["D.G. de Educación Primaria", "D.G. de Educación Secundaria"] },
-                    { name: "Viceministerio de Educación Superior de Formación Profesional, Ciencia, Tecnología e Innovación", directorates: ["D.G. de Educación Superior Técnica y Tecnológica", "D.G. de Educación Superior Universitaria", "D.G. de Formación de Maestros", "D.G. de Ciencia, Tecnología e Innovación"] },
-                    { name: "Viceministerio de Educación Alternativa, Especial y Desarrollo del Talento Humano", directorates: ["D.G. de Educación Alternativa", "D.G. de Educación Especial", "D.G. de Postalfabetización"] }
-                ]
+                id: 10, nombre: "Ministerio de Educación", icono: "fa-graduation-cap", color: "bg-sky-500", bgLight: "bg-sky-50", textColor: "text-sky-600",
+                desc: "Art. 81: Conduce el Sistema Educativo Plurinacional, ciencia y tecnología.",
+                viceministerios: [
+                    { nombre: "Viceministerio de Educación Regular", desc: "Art. 82: Gestión de unidades escolares.", direcciones: [
+                        {nombre: "DG de Educación Primaria", desc: "Planes de estudio."}, {nombre: "DG de Educación Secundaria", desc: "Bachillerato."}
+                    ] },
+                    { nombre: "Viceministerio de Educación Superior de Formación Profesional, Ciencia, Tecnología e Innovación", desc: "Art. 83: Universidades, institutos e investigación.", direcciones: [
+                        {nombre: "DG de Educación Superior Técnica, Tecnológica, Lingüística y Artística", desc: "Institutos superiores."}, {nombre: "DG de Educación Superior Universitaria", desc: "Regulación universitaria."}, {nombre: "DG de Formación de Maestros", desc: "Normales."}, {nombre: "DG de Ciencia, Tecnología e Innovación", desc: "Políticas de C&T."}
+                    ] },
+                    { nombre: "Viceministerio de Educación Alternativa, Especial y Desarrollo del Talento Humano", desc: "Art. 84: Inclusión y alfabetización.", direcciones: [
+                        {nombre: "DG de Educación Alternativa y Desarrollo del Talento Humano", desc: "Centros de adultos."}, {nombre: "DG de Educación Especial", desc: "Atención a discapacidad."}, {nombre: "DG de Postalfabetización", desc: "Continuidad educativa."}
+                    ] }
+                ],
+                entidades: [
+                    { nombre: "Escuela de Gestión Pública Plurinacional (EGPP)", tipo: "Entidad Descentralizada bajo tuición", desc: "Formación de servidores públicos." },
+                    { nombre: "Conservatorio Plurinacional de Música", tipo: "Entidad Descentralizada bajo tuición", desc: "Artes musicales." },
+                    { nombre: "Academia Nacional de Ciencias", tipo: "Entidad Descentralizada bajo tuición", desc: "Fomento científico." },
+                    { nombre: "Proyecto Sucre Ciudad Universitaria", tipo: "Entidad Descentralizada bajo tuición", desc: "Infraestructura universitaria." },
+                    { nombre: "Escuela Boliviana Intercultural de Música (EBIM)", tipo: "Entidad Descentralizada bajo tuición", desc: "Saberes musicales originarios." },
+                    { nombre: "Instituto Plur. de Estudio de Lenguas (IPELC)", tipo: "Entidad Descentralizada bajo tuición", desc: "Idiomas oficiales." },
+                    { nombre: "Escuela Boliviana Intercultural de Danza", tipo: "Entidad Descentralizada bajo tuición", desc: "Danzas originarias." },
+                    { nombre: "Universidad Pedagógica", tipo: "Entidad Descentralizada bajo tuición", desc: "Posgrados para maestros." },
+                    { nombre: "U. Indígena Boliviana Aymara Tupak Katari", tipo: "Entidad Descentralizada bajo tuición", desc: "Educación superior indígena." },
+                    { nombre: "U. Indígena Boliviana Quechua Casimiro Huanca", tipo: "Entidad Descentralizada bajo tuición", desc: "Educación superior indígena." },
+                    { nombre: "U. Indígena Boliviana Guaraní Apiaguaiki Tüpa", tipo: "Entidad Descentralizada bajo tuición", desc: "Educación superior indígena." }
+                ],
+                extra: []
             },
             {
-                id: 11, name: "Ministerio de Salud y Deportes",
-                desconcentradas: ["CENETROP", "INLASA", "Escuela de Salud de La Paz", "Escuela de Salud Cochabamba", "AGEMED", "CONALPEDIS", "Fondo Nacional de Solidaridad y Equidad"],
-                descentralizadas: ["Instituto Boliviano de la Ceguera", "LONABOL", "CEASS", "INSO", "AISEM", "ASUSS", "Instituto Gastroenterológico del Bicentenario"],
-                viceministries: [
-                    { name: "Viceministerio de Gestión del Sistema Nacional de Salud", directorates: ["D.G. de Redes de Servicios de Salud", "D.G. de Gestión Hospitalaria", "D.G. del Sistema Nacional de Salud"] },
-                    { name: "Viceministerio de Promoción de la Salud, Epidemiología y Medicina Tradicional", directorates: ["D.G. de Promoción y Prevención", "D.G. de Medicina Tradicional", "D.G. de Epidemiología"] },
-                    { name: "Viceministerio de Deportes", directorates: ["D.G. de Deportes", "D.G. de Formación Deportiva"] }
-                ]
+                id: 11, nombre: "Ministerio de Salud y Deportes", icono: "fa-heartbeat", color: "bg-red-500", bgLight: "bg-red-50", textColor: "text-red-600",
+                desc: "Art. 86: Rectoría del Sistema Nacional de Salud, hospitales y práctica deportiva.",
+                viceministerios: [
+                    { nombre: "Viceministerio de Gestión del Sistema Nacional de Salud", desc: "Art. 87: Redes hospitalarias y seguros.", direcciones: [
+                        {nombre: "DG de Redes de Servicios de Salud", desc: "Centros de primer y segundo nivel."}, {nombre: "DG de Gestión Hospitalaria", desc: "Tercer nivel e institutos."}, {nombre: "DG del Sistema Nacional de Salud", desc: "Seguro Universal (SUS)."}
+                    ] },
+                    { nombre: "Viceministerio de Promoción de la Salud, Epidemiología y Medicina Tradicional", desc: "Art. 88: Salud pública y saberes ancestrales.", direcciones: [
+                        {nombre: "DG de Promoción y Prevención de la Salud", desc: "Educación en salud."}, {nombre: "DG de Medicina Tradicional", desc: "Farmacopea natural."}, {nombre: "DG de Epidemiología", desc: "Vigilancia de brotes."}
+                    ] },
+                    { nombre: "Viceministerio de Deportes", desc: "Art. 89: Competiciones y alto rendimiento.", direcciones: [
+                        {nombre: "DG de Deportes", desc: "Infraestructura deportiva."}, {nombre: "DG de Formación Deportiva", desc: "Apoyo a atletas."}
+                    ] }
+                ],
+                entidades: [
+                    { nombre: "Centro Nacional de Enfermedades Tropicales (CENETROP)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Investigación endémica." },
+                    { nombre: "Instituto Nacional de Laboratorios (INLASA)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Análisis referencial." },
+                    { nombre: "Escuela de Salud de La Paz (ESLP)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Formación técnica." },
+                    { nombre: "Escuela de Salud Cochabamba (ESCBBA)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Formación técnica." },
+                    { nombre: "Agencia Estatal de Medicamentos (AGEMED)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Control farmacéutico." },
+                    { nombre: "Comité Nac. de Personas con Discapacidad (CONALPEDIS)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Inclusión social." },
+                    { nombre: "Unidad Ejecutora del Fondo Nacional de Solidaridad (FNSE)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Ayudas técnicas." },
+                    { nombre: "Instituto Boliviano de la Ceguera (IBC)", tipo: "Entidad Descentralizada bajo tuición", desc: "Rehabilitación visual." },
+                    { nombre: "Lotería Nacional de Beneficencia (LONABOL)", tipo: "Entidad Descentralizada bajo tuición", desc: "Recaudación social." },
+                    { nombre: "Central de Abastecimiento de Salud (CEASS)", tipo: "Entidad Descentralizada bajo tuición", desc: "Provisión de insumos." },
+                    { nombre: "Instituto Nacional de Salud Ocupacional (INSO)", tipo: "Entidad Descentralizada bajo tuición", desc: "Enfermedades laborales." },
+                    { nombre: "Agencia de Infraestructura en Salud (AISEM)", tipo: "Entidad Descentralizada bajo tuición", desc: "Construcción de hospitales." },
+                    { nombre: "Autoridad de Seguridad Social a Corto Plazo (ASUSS)", tipo: "Entidad Descentralizada bajo tuición", desc: "Regulación a Cajas de Salud." },
+                    { nombre: "Instituto Gastroenterológico del Bicentenario", tipo: "Entidad Descentralizada bajo tuición", desc: "Hospital de cuarto nivel." }
+                ],
+                extra: []
             },
             {
-                id: 12, name: "Ministerio de Obras Públicas, Servicios y Vivienda",
-                desconcentradas: ["Centro de Comunicaciones La Paz", "Terminal Terrestre Santa Cruz", "MI TREN", "UPRE"],
-                descentralizadas: ["Vías Bolivia", "ATT", "AEVIVIENDA", "Agencia Boliviana de Correos", "NAABOL"],
-                autarquicas: ["DGAC", "Administradora Boliviana de Carreteras - ABC"],
-                empresas: ["ENFE residual", "Boliviana de Aviación - BoA", "Agencia Boliviana Espacial", "Empresa Estratégica EBC", "Mi Teleférico", "ENTEL"],
-                viceministries: [
-                    { name: "Viceministerio de Transportes", directorates: ["D.G. de Transporte Terrestre, Fluvial y Lacustre", "D.G. de Transporte Aéreo"] },
-                    { name: "Viceministerio de Telecomunicaciones y TIC", directorates: ["D.G. de Telecomunicaciones", "D.G. de Servicios en Telecomunicaciones y TIC"] },
-                    { name: "Viceministerio de Vivienda y Urbanismo", directorates: ["D.G. de Vivienda y Urbanismo", "D.G. de Ordenamiento Urbano"] }
-                ]
+                id: 12, nombre: "Ministerio de Obras Públicas, Servicios y Vivienda", icono: "fa-road", color: "bg-teal-600", bgLight: "bg-teal-50", textColor: "text-teal-700",
+                desc: "Art. 91: Infraestructura vial, telecomunicaciones, aeronáutica y déficit habitacional.",
+                viceministerios: [
+                    { nombre: "Viceministerio de Transportes", desc: "Art. 92: Integración caminera, aérea y fluvial.", direcciones: [
+                        {nombre: "DG de Transporte Terrestre, Fluvial y Lacustre", desc: "Regulación de tráfico."}, {nombre: "DG de Transporte Aéreo", desc: "Política aeronáutica."}
+                    ] },
+                    { nombre: "Viceministerio de Telecomunicaciones y Tecnologías de Información y Comunicación", desc: "Art. 93: Conectividad y espectro.", direcciones: [
+                        {nombre: "DG de Telecomunicaciones", desc: "Banda ancha y satélites."}, {nombre: "DG de Servicios en TIC", desc: "Reducción de brecha digital."}
+                    ] },
+                    { nombre: "Viceministerio de Vivienda y Urbanismo", desc: "Art. 94: Mejoramiento habitacional.", direcciones: [
+                        {nombre: "DG de Vivienda y Urbanismo", desc: "Planes habitacionales."}, {nombre: "DG de Ordenamiento Urbano", desc: "Catastro y metropolización."}
+                    ] }
+                ],
+                entidades: [
+                    { nombre: "Centro de Comunicaciones La Paz", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Edificio público." },
+                    { nombre: "Administradora de Terminal Terrestre Santa Cruz", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Terminal bimodal." },
+                    { nombre: "Operadora del Tren Metropolitano (MI TREN)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Ferrocarril urbano Cbba." },
+                    { nombre: "Unidad de Proyectos Especiales (UPRE)", tipo: "Entidad Desconcentrada bajo dependencia", desc: "Infraestructura rápida." },
+                    { nombre: "Vías Bolivia", tipo: "Entidad Descentralizada bajo tuición", desc: "Cobro de peajes." },
+                    { nombre: "Autoridad de Telecomunicaciones (ATT)", tipo: "Entidad Descentralizada bajo tuición", desc: "Regulador sectorial." },
+                    { nombre: "Agencia Estatal de Vivienda (AEVIVIENDA)", tipo: "Entidad Descentralizada bajo tuición", desc: "Construcción social." },
+                    { nombre: "Agencia Boliviana de Correos", tipo: "Entidad Descentralizada bajo tuición", desc: "Servicio postal." },
+                    { nombre: "Navegación Aérea y Aeropuertos (NAABOL)", tipo: "Entidad Descentralizada bajo tuición", desc: "Administración de terminales." },
+                    { nombre: "Dirección General de Aeronáutica (DGAC)", tipo: "Entidad Autárquica bajo tuición", desc: "Seguridad de aviación." },
+                    { nombre: "Administradora Boliviana de Carreteras (ABC)", tipo: "Entidad Autárquica bajo tuición", desc: "Red Vial Fundamental." },
+                    { nombre: "Empresa Nacional de Ferrocarriles (ENFE residual)", tipo: "Empresa Pública bajo tuición", desc: "Red ferroviaria residual." },
+                    { nombre: "Boliviana de Aviación (BoA)", tipo: "Empresa Pública bajo tuición", desc: "Aerolínea bandera." },
+                    { nombre: "Agencia Boliviana Espacial (ABE)", tipo: "Empresa Pública bajo tuición", desc: "Satélite Túpac Katari." },
+                    { nombre: "Empresa Estratégica Boliviana de Construcción (EBC)", tipo: "Empresa Pública bajo tuición", desc: "Construcción civil." },
+                    { nombre: "Empresa Estatal de Transporte Mi Teleférico", tipo: "Empresa Pública bajo tuición", desc: "Transporte por cable." },
+                    { nombre: "Empresa Nacional de Telecomunicaciones (ENTEL)", tipo: "Sociedad con participación accionaria bajo vinculación sectorial", desc: "Operador estatal." }
+                ],
+                extra: []
             }
         ];
 
-        const modificacionesData = [
-            {
-                title: "Supresión de Carteras",
-                items: [
-                    "Se suprime el Ministerio de Planificación del Desarrollo y Medio Ambiente.",
-                    "Se suprime el Ministerio de Turismo Sostenible, Culturas, Folklore y Gastronomía."
-                ]
-            },
-            {
-                title: "Transferencias Institucionales",
-                items: [
-                    "Viceministerio de Ciencia y Tecnología pasa al Ministerio de Educación.",
-                    "Viceministerio de Planificación Estratégica pasa al Ministerio de la Presidencia.",
-                    "Viceministerio de Inversión Pública pasa al Ministerio de Economía y Finanzas Públicas.",
-                    "Viceministerio de Medio Ambiente pasa al Ministerio de Producción Sostenible.",
-                    "Competencias de Turismo y Culturas pasan al Ministerio de Relaciones Exteriores."
-                ]
-            },
-            {
-                title: "Cambios Adicionales",
-                items: [
-                    "Entidad 'CONOCE BOLIVIA' cambia de nombre a 'BOLIVIA EN EL MUNDO'.",
-                    "Fideicomisos del ex Ministerio de Planificación pasan a Producción Sostenible.",
-                    "La Autoridad de Impugnación Tributaria mantiene sus funciones."
-                ]
+        // Función para renderizar el Avatar o Foto (Tamaño aumentado)
+        function getAvatarImg(name, photoUrl, sizeClass = "w-12 h-12") {
+            const safeName = (name || "Autoridad").replace(/'/g, "&apos;");
+            const fallbackUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'A D')}&background=e2e8f0&color=475569&bold=true`;
+            if (photoUrl && photoUrl.trim() !== "") {
+                return `<img src="${photoUrl}" class="${sizeClass} rounded-full object-cover shadow-sm border border-slate-200 shrink-0 bg-white" alt="${safeName}" onerror="this.src='${fallbackUrl}'">`;
             }
+            return `<img src="${fallbackUrl}" class="${sizeClass} rounded-full object-cover shadow-sm border border-slate-200 shrink-0 bg-white" alt="${safeName}">`;
+        }
+
+        // Helper para resaltar búsquedas
+        function highlightText(text, term) {
+            if (!term || term.trim() === "") return text;
+            const safeText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, "gi");
+            return safeText.replace(regex, '<mark class="bg-amber-300 text-amber-900 rounded-sm px-0.5 shadow-sm">$1</mark>');
+        }
+
+        const commonExtras = [
+            { nombre: "Dirección General de Planificación", desc: "Art. 100: Coordina y articula la planificación estratégica." },
+            { nombre: "Dirección General de Asuntos Administrativos", desc: "Art. 101: Gestión administrativa, financiera y de RRHH." },
+            { nombre: "Dirección General de Asuntos Jurídicos", desc: "Art. 102: Asesoramiento jurídico especializado." },
+            { nombre: "Unidad de Auditoría Interna", desc: "Art. 104: Control y auditoría gubernamental." },
+            { nombre: "Unidad de Transparencia y Lucha Contra la Corrupción", desc: "Art. 105: Prevención de corrupción y acceso a información." }
         ];
 
-        // --- STREAMING_CHUNK:Lógica de Estado y Filtros... ---
-        let viewMode = 'list'; // 'list' o 'chart'
-        let searchTerm = '';
-        let expandedAccordionId = null;
+        // Función para actualizar los KPIs en la vista general
+        function actualizarKPIs(data) {
+            const totalVices = data.reduce((acc, min) => acc + (min.viceministerios ? min.viceministerios.length : 0), 0);
+            const totalEntidades = data.reduce((acc, min) => acc + (min.entidades ? min.entidades.length : 0), 0);
+            
+            const kpiVices = document.getElementById('kpi-viceministries');
+            const kpiEntidades = document.getElementById('kpi-entidades');
+            
+            if (kpiVices) kpiVices.innerText = totalVices;
+            if (kpiEntidades) kpiEntidades.innerText = totalEntidades;
+        }
 
-        const btnViewList = document.getElementById('btn-view-list');
-        const btnViewChart = document.getElementById('btn-view-chart');
-        const searchInput = document.getElementById('search-input');
-        const btnClear = document.getElementById('btn-clear');
-        const container = document.getElementById('ministries-container');
-        const modsContainer = document.getElementById('modifications-container');
+        // Inicialización de la Base de Datos Local
+        let ministerios = baseMinisterios.map(min => {
+            let cleanName = min.nombre.replace('Ministerio de ', '').trim();
+            let nombreAutoridad = "Autoridad por Designar";
+            if(min.id === 1) nombreAutoridad = "Héctor Francisco Huanca Gutiérrez (a.i.)";
+            if(min.id === 6) nombreAutoridad = "Williams José Bascope Laruta";
+            
+            return {
+                ...min,
+                autoridad: nombreAutoridad,
+                contacto: `despacho@${cleanName.toLowerCase().replace(/[^a-z]/g, '')}.gob.bo`,
+                foto: "",
+                viceministerios: min.viceministerios.map((vice, vIdx) => ({
+                    ...vice,
+                    id: `v_${min.id}_${vIdx}`,
+                    autoridad: "Viceministro/a por Designar",
+                    contacto: `v.despacho@${cleanName.toLowerCase().replace(/[^a-z]/g, '')}.gob.bo`,
+                    foto: "",
+                    direcciones: vice.direcciones.map((dir, dIdx) => ({
+                        nombre: dir.nombre,
+                        desc: dir.desc,
+                        id: `d_${min.id}_${vIdx}_${dIdx}`,
+                        autoridad: "Director/a General por Designar",
+                        contacto: "Telf: (591) 2-200000",
+                        foto: ""
+                    }))
+                })),
+                extra: (min.extra || []).map((ext, eIdx) => ({
+                    nombre: ext.nombre,
+                    desc: ext.desc,
+                    id: `e_${min.id}_${eIdx}`,
+                    autoridad: "Director/a o Jefe/a por Designar",
+                    contacto: "Telf: (591) 2-200000",
+                    foto: ""
+                })),
+                estructuraComun: commonExtras.map((ext, eIdx) => ({
+                    nombre: ext.nombre,
+                    desc: ext.desc,
+                    id: `c_${min.id}_${eIdx}`,
+                    autoridad: "Director/a o Jefe/a por Designar",
+                    contacto: "Telf: (591) 2-200000",
+                    foto: ""
+                })),
+                entidades: (min.entidades || []).map((ent, eIdx) => ({
+                    nombre: ent.nombre,
+                    tipo: ent.tipo,
+                    desc: ent.desc,
+                    id: `ent_${min.id}_${eIdx}`,
+                    autoridad: "Director/a o Gerente por Designar",
+                    contacto: "Telf: (591) 2-200000",
+                    foto: ""
+                }))
+            };
+        });
 
-        const normalizeText = (text) => text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        // ------------------ EXPORTAR EXCEL ------------------
+        function exportarExcel() {
+            const cabecera = ["Nivel", "Ministerio", "Viceministerio", "Nombre_Area", "Autoridad_Cargo", "Contacto", "Foto_URL", "Descripcion", "Tipo_Entidad", "Icono", "Color", "BgLight", "TextColor"];
+            let filas = [cabecera];
+            
+            ministerios.forEach(min => {
+                filas.push(["Ministerio", min.nombre, "", "", min.autoridad, min.contacto, min.foto || "", min.desc || "", "", min.icono, min.color, min.bgLight, min.textColor]);
+                min.viceministerios.forEach(vice => {
+                    filas.push(["Viceministerio", min.nombre, vice.nombre, "", vice.autoridad, vice.contacto, vice.foto || "", vice.desc || "", "", "", "", "", ""]);
+                    vice.direcciones.forEach(dir => {
+                        filas.push(["Dirección General", min.nombre, vice.nombre, dir.nombre, dir.autoridad, dir.contacto, dir.foto || "", dir.desc || "", "", "", "", "", ""]);
+                    });
+                });
+                if(min.extra) {
+                    min.extra.forEach(ext => {
+                        filas.push(["Dirección (Directa)", min.nombre, "", ext.nombre, ext.autoridad, ext.contacto, ext.foto || "", ext.desc || "", "", "", "", "", ""]);
+                    });
+                }
+                if(min.estructuraComun) {
+                    min.estructuraComun.forEach(c => {
+                        filas.push(["Estructura Común", min.nombre, "", c.nombre, c.autoridad, c.contacto, c.foto || "", c.desc || "", "", "", "", "", ""]);
+                    });
+                }
+                if(min.entidades) {
+                    min.entidades.forEach(e => {
+                        filas.push(["Entidad Bajo Tuición/Sujeción", min.nombre, "", e.nombre, e.autoridad, e.contacto, e.foto || "", e.desc || "", e.tipo || "", "", "", "", ""]);
+                    });
+                }
+            });
 
-        const getFilteredData = () => {
-            if (!searchTerm) return ministeriosData;
-            const term = normalizeText(searchTerm);
+            const ws = XLSX.utils.aoa_to_sheet(filas);
+            const wscols = [ {wch: 25}, {wch: 45}, {wch: 50}, {wch: 45}, {wch: 35}, {wch: 25}, {wch: 30}, {wch: 50}, {wch: 20} ];
+            ws['!cols'] = wscols;
 
-            return ministeriosData.map(min => {
-                const matchName = normalizeText(min.name).includes(term);
-                
-                const filterArr = (arr) => (arr || []).filter(item => normalizeText(item).includes(term));
-                
-                const filteredVms = min.viceministries.map(vm => {
-                    const matchVm = normalizeText(vm.name).includes(term);
-                    const matchDirs = filterArr(vm.directorates);
-                    if (matchVm || matchDirs.length > 0) return { ...vm, directorates: matchVm && matchDirs.length === 0 ? vm.directorates : matchDirs };
-                    return null;
-                }).filter(Boolean);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Estructura Ejecutivo");
+            XLSX.writeFile(wb, "ds5675.xlsx");
+        }
 
-                const fExtra = filterArr(min.apoyoTransversalExtra);
-                const fDesc = filterArr(min.desconcentradas);
-                const fDescen = filterArr(min.descentralizadas);
-                const fAut = filterArr(min.autarquicas);
-                const fEmp = filterArr(min.empresas);
-                const fSoc = filterArr(min.sociedades);
+        // ------------------ IMPORTAR DESDE GOOGLE SHEETS ------------------
+        
+        // ⚠️ IMPORTANTE: REEMPLAZA ESTE ID CON EL ID REAL DE TU GOOGLE SHEET ⚠️
+        const GOOGLE_SHEET_ID = '1UEJsayl3N6gPw72km7vKc0PKC06SCzjut9R6zhSLlco'; 
+        // Nombre exacto de la pestaña en tu Google Sheet
+        const GOOGLE_SHEET_NAME = 'Estructura Ejecutivo';
 
-                if (matchName || filteredVms.length > 0 || fExtra.length > 0 || fDesc.length > 0 || fDescen.length > 0 || fAut.length > 0 || fEmp.length > 0 || fSoc.length > 0) {
-                    return {
-                        ...min,
-                        viceministries: matchName && filteredVms.length === 0 ? min.viceministries : filteredVms,
-                        apoyoTransversalExtra: matchName && fExtra.length === 0 ? min.apoyoTransversalExtra : fExtra,
-                        desconcentradas: matchName && fDesc.length === 0 ? min.desconcentradas : fDesc,
-                        descentralizadas: matchName && fDescen.length === 0 ? min.descentralizadas : fDescen,
-                        autarquicas: matchName && fAut.length === 0 ? min.autarquicas : fAut,
-                        empresas: matchName && fEmp.length === 0 ? min.empresas : fEmp,
-                        sociedades: matchName && fSoc.length === 0 ? min.sociedades : fSoc,
+        function fetchGoogleSheetsData() {
+            return new Promise((resolve, reject) => {
+                const url = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(GOOGLE_SHEET_NAME)}`;
+                Papa.parse(url, {
+                    download: true,
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        resolve(results.data);
+                    },
+                    error: function(error) {
+                        reject(error);
+                    }
+                });
+            });
+        }
+
+        async function fetchFromGoogleSheets(isManual = true) {
+            const btn = document.getElementById('btn-sync');
+            const originalHTML = btn ? btn.innerHTML : '';
+
+            if (GOOGLE_SHEET_ID === 'TU_ID_DE_GOOGLE_SHEET_AQUI' && isManual) {
+                alert("Para usar esta función, primero debes reemplazar 'TU_ID_DE_GOOGLE_SHEET_AQUI' con el ID real de tu documento de Google Sheets en el código fuente.");
+                return false;
+            } else if (GOOGLE_SHEET_ID === 'TU_ID_DE_GOOGLE_SHEET_AQUI') {
+                return false;
+            }
+
+            if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+            
+            try {
+                const data = await fetchGoogleSheetsData();
+                if(data && data.length > 0) {
+                    procesarDatosGoogleSheets(data);
+                    if (btn) {
+                        btn.innerHTML = '<i class="fas fa-check"></i> Sincronizado';
+                        setTimeout(() => btn.innerHTML = originalHTML, 2000);
+                    }
+                    return true;
+                } else {
+                    if (isManual) alert("No se encontraron datos en la hoja de Google.");
+                    if (btn) btn.innerHTML = originalHTML;
+                    return false;
+                }
+            } catch (error) {
+                console.error("Error cargando Google Sheets:", error);
+                if (isManual) alert("Error al cargar los datos. Verifica el ID del documento y que tenga permisos públicos.");
+                if (btn) btn.innerHTML = originalHTML;
+                return false;
+            }
+        }
+
+        function procesarDatosGoogleSheets(filas) {
+            let tempMinisterios = {};
+
+            filas.forEach(fila => {
+                const nivel = fila["Nivel"];
+                const minNombre = fila["Ministerio"];
+                const viceNombre = fila["Viceministerio"];
+                const dirNombre = fila["Dirección"];
+                const autoridad = fila["Autoridad_Cargo"];
+                const contacto = fila["Contacto"];
+                const foto = fila["Foto_URL"];
+
+                if (!minNombre || minNombre.trim() === "") return;
+
+                if (!tempMinisterios[minNombre]) {
+                    const original = baseMinisterios.find(m => m.nombre === minNombre) || {};
+                    tempMinisterios[minNombre] = {
+                        id: original.id || Date.now() + Math.floor(Math.random()*1000),
+                        nombre: minNombre,
+                        autoridad: nivel === "Ministerio" ? (autoridad || "") : "Autoridad por Designar",
+                        contacto: nivel === "Ministerio" ? (contacto || "") : "-",
+                        foto: nivel === "Ministerio" ? (foto || "") : "",
+                        icono: original.icono || "fa-landmark",
+                        color: original.color || "bg-slate-500",
+                        bgLight: original.bgLight || "bg-slate-50",
+                        textColor: original.textColor || "text-slate-600",
+                        viceministerios: [],
+                        extra: [],
+                        estructuraComun: [],
+                        entidades: []
                     };
                 }
-                return null;
-            }).filter(Boolean);
-        };
 
-        // --- STREAMING_CHUNK:Generadores de HTML (Vista Lista)... ---
-        const renderListItems = (items) => items.map(item => `<li class="text-sm text-slate-700 flex gap-2"><span class="text-slate-400">•</span> <span>${item}</span></li>`).join('');
+                if (nivel === "Ministerio") {
+                    tempMinisterios[minNombre].autoridad = autoridad || "";
+                    tempMinisterios[minNombre].contacto = contacto || "";
+                    tempMinisterios[minNombre].foto = foto || "";
+                }
+                
+                if (nivel === "Viceministerio") {
+                    let vice = tempMinisterios[minNombre].viceministerios.find(v => v.nombre === viceNombre);
+                    if (!vice) {
+                        vice = { id: `v_${tempMinisterios[minNombre].id}_${Date.now()}_${Math.floor(Math.random()*1000)}`, nombre: viceNombre, autoridad: autoridad || "", contacto: contacto || "", foto: foto || "", direcciones: [] };
+                        tempMinisterios[minNombre].viceministerios.push(vice);
+                    } else {
+                        vice.autoridad = autoridad || "";
+                        vice.contacto = contacto || "";
+                        vice.foto = foto || "";
+                    }
+                }
 
-        const renderListView = (min) => {
-            const apoyoT = [...apoyoTransversalComun, ...(min.apoyoTransversalExtra || [])];
-            let html = `<div class="p-6 bg-slate-50"><div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">`;
-            
-            // Apoyo
-            html += `<div class="bg-white p-5 rounded-xl border border-amber-200 shadow-sm"><h4 class="font-bold text-amber-800 mb-3 text-sm uppercase">Apoyo Directo</h4><ul class="space-y-1.5">${renderListItems(apoyoDirectoComun)}</ul></div>`;
-            html += `<div class="bg-white p-5 rounded-xl border border-amber-200 shadow-sm"><h4 class="font-bold text-amber-800 mb-3 text-sm uppercase">Apoyo Transversal</h4><ul class="space-y-1.5">${renderListItems(apoyoT)}</ul></div>`;
-            html += `</div>`;
+                if (nivel === "Dirección General") {
+                    let vice = tempMinisterios[minNombre].viceministerios.find(v => v.nombre === viceNombre);
+                    if (!vice) {
+                        vice = { id: `v_${tempMinisterios[minNombre].id}_${Date.now()}_${Math.floor(Math.random()*1000)}`, nombre: viceNombre, autoridad: "", contacto: "", foto: "", direcciones: [] };
+                        tempMinisterios[minNombre].viceministerios.push(vice);
+                    }
+                    vice.direcciones.push({
+                        nombre: dirNombre,
+                        id: `d_${tempMinisterios[minNombre].id}_${Date.now()}_${Math.floor(Math.random()*10000)}`,
+                        autoridad: autoridad || "",
+                        contacto: contacto || "",
+                        foto: foto || ""
+                    });
+                }
 
-            // VMS
-            html += `<h3 class="text-lg font-bold text-slate-800 mb-4 border-b border-slate-200 pb-2">Viceministerios y Direcciones</h3>`;
-            html += `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mb-8">`;
-            min.viceministries.forEach(vm => {
-                html += `<div class="bg-white p-5 rounded-xl border border-blue-200 shadow-sm"><h4 class="font-bold text-blue-800 mb-3 leading-tight">${vm.name}</h4><ul class="space-y-2">${vm.directorates.map(d => `<li class="text-xs text-slate-600 flex gap-1.5"><span class="text-blue-400 mt-0.5">-</span> <span class="leading-tight">${d}</span></li>`).join('')}</ul></div>`;
+                if (nivel === "Estructura Común") {
+                    tempMinisterios[minNombre].estructuraComun.push({
+                        nombre: dirNombre,
+                        id: `c_${tempMinisterios[minNombre].id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+                        autoridad: autoridad || "",
+                        contacto: contacto || "",
+                        foto: foto || ""
+                    });
+                }
+                
+                if (nivel === "Dirección (Directa)") {
+                    tempMinisterios[minNombre].extra.push({
+                        nombre: dirNombre,
+                        id: `e_${tempMinisterios[minNombre].id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+                        autoridad: autoridad || "",
+                        contacto: contacto || "",
+                        foto: foto || ""
+                    });
+                }
+
+                if (nivel === "Entidad Bajo Tuición/Sujeción") {
+                    tempMinisterios[minNombre].entidades.push({
+                        nombre: dirNombre,
+                        tipo: "Entidad/Empresa", 
+                        id: `ent_${tempMinisterios[minNombre].id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+                        autoridad: autoridad || "",
+                        contacto: contacto || "",
+                        foto: foto || ""
+                    });
+                }
             });
-            html += `</div>`;
 
-            // Entidades
-            const hasEntities = min.desconcentradas?.length || min.descentralizadas?.length || min.autarquicas?.length || min.empresas?.length || min.sociedades?.length;
-            if(hasEntities) {
-                html += `<h3 class="text-lg font-bold text-slate-800 mb-4 border-b border-slate-200 pb-2">Entidades Bajo Tuición / Sujeción</h3>`;
-                html += `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">`;
-                const renderEntGroup = (title, items) => items?.length ? `<div class="bg-white p-4 rounded-xl border border-teal-200 shadow-sm"><h4 class="font-bold text-teal-800 text-xs uppercase tracking-wide mb-3">${title}</h4><ul class="space-y-1.5">${items.map(i => `<li class="text-xs text-slate-600 flex gap-1.5"><span class="text-teal-400">•</span><span class="leading-tight">${i}</span></li>`).join('')}</ul></div>` : '';
-                html += renderEntGroup("Desconcentradas", min.desconcentradas);
-                html += renderEntGroup("Descentralizadas", min.descentralizadas);
-                html += renderEntGroup("Autárquicas", min.autarquicas);
-                html += renderEntGroup("Empresas Públicas", min.empresas);
-                html += renderEntGroup("Sociedades (Estado)", min.sociedades);
-                html += `</div>`;
-            }
-            html += `</div>`;
-            return html;
-        };
-
-        // --- STREAMING_CHUNK:Generadores de HTML (Vista Árbol Híbrido)... ---
-        const buildNode = (title, type) => `<div class="org-node node-${type}">${title}</div>`;
-        const buildStackedUl = (items, nodeType) => `<ul class="stacked">${items.map(item => `<li>${buildNode(item, nodeType)}</li>`).join('')}</ul>`;
-
-        const renderChartView = (min) => {
-            const apoyoT = [...apoyoTransversalComun, ...(min.apoyoTransversalExtra || [])];
+            ministerios = Object.values(tempMinisterios);
             
-            // 1. Rama Apoyo (Apilado)
-            let branchApoyo = `
-                <li>
-                    ${buildNode('Estructuras de Apoyo', 'apoyo-parent')}
-                    <ul class="stacked">
-                        <li>${buildNode('APOYO DIRECTO', 'apoyo-parent')}
-                            ${buildStackedUl(apoyoDirectoComun, 'apoyo-item')}
-                        </li>
-                        <li>${buildNode('APOYO TRANSVERSAL', 'apoyo-parent')}
-                            ${buildStackedUl(apoyoT, 'apoyo-item')}
-                        </li>
-                    </ul>
-                </li>
-            `;
+            // Re-render
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            aplicarFiltro(searchTerm);
+            actualizarKPIs(ministerios);
+        }
 
-            // 2. Rama Viceministerios (Híbrido)
-            let vmsChildren = min.viceministries.map(vm => {
-                let dirs = vm.directorates.length ? buildStackedUl(vm.directorates, 'direccion') : '';
-                return `<li>${buildNode(vm.name, 'viceministerio')}${dirs}</li>`;
-            }).join('');
-            let branchVms = `<li>${buildNode('Viceministerios', 'vms-parent')}<ul>${vmsChildren}</ul></li>`;
-
-            // 3. Rama Entidades (Híbrido)
-            let entGroups = [];
-            if(min.desconcentradas?.length) entGroups.push({t: 'Desconcentradas', i: min.desconcentradas});
-            if(min.descentralizadas?.length) entGroups.push({t: 'Descentralizadas', i: min.descentralizadas});
-            if(min.autarquicas?.length) entGroups.push({t: 'Autárquicas', i: min.autarquicas});
-            if(min.empresas?.length) entGroups.push({t: 'Empresas Públicas', i: min.empresas});
-            if(min.sociedades?.length) entGroups.push({t: 'Sociedades Estado', i: min.sociedades});
-
-            let branchEnt = '';
-            if(entGroups.length > 0) {
-                let entChildren = entGroups.map(g => `<li>${buildNode(g.t, 'entidad-group')}${buildStackedUl(g.i, 'entidad-item')}</li>`).join('');
-                branchEnt = `<li>${buildNode('Entidades Relacionadas', 'entidad-parent')}<ul>${entChildren}</ul></li>`;
-            }
-
-            let rootTitle = `Ministra(o) de ${min.name.replace('Ministerio de ', '')}`;
-            
+        // ------------------ MODAL PERFIL JERÁRQUICO ------------------
+        function buildHierarchyCard(nombre, autoridad, cargo, foto, contacto, bgClass = "bg-white", extraClass = "", onClickStr = "") {
             return `
-                <div class="org-chart-wrapper">
-                    <div class="org-tree">
-                        <ul>
-                            <li>
-                                ${buildNode(rootTitle, 'ministro')}
-                                <ul>
-                                    ${branchApoyo}
-                                    ${branchVms}
-                                    ${branchEnt}
-                                </ul>
-                            </li>
-                        </ul>
+                <div class="${bgClass} border border-slate-200 rounded-xl p-3 flex items-center gap-3 shadow-sm ${extraClass}" ${onClickStr}>
+                    ${getAvatarImg(autoridad, foto, 'w-10 h-10')}
+                    <div class="flex flex-col overflow-hidden w-full">
+                        <div class="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">${cargo}</div>
+                        <div class="text-sm font-bold text-slate-800 truncate">${autoridad}</div>
+                        <div class="text-[10px] font-medium text-slate-500 truncate mt-0.5">${nombre}</div>
                     </div>
                 </div>
             `;
-        };
+        }
 
-        // --- STREAMING_CHUNK:Controladores de Interfaz... ---
-        const renderData = () => {
-            const data = getFilteredData();
-            container.innerHTML = '';
+        function openProfileModal(event, type, minId, viceId = null, dirId = null) {
+            if(event) { event.stopPropagation(); event.preventDefault(); }
+            
+            const min = ministerios.find(m => m.id == minId);
+            if(!min) return;
 
-            if (data.length === 0) {
-                container.innerHTML = `<div class="text-center py-16 bg-white rounded-2xl border border-slate-200 text-slate-500">No se encontraron resultados.</div>`;
+            let targetName, targetAuth, targetRole, targetContact, targetPhoto;
+            let superiorHTML = "", currentHTML = "", subordinatesHTML = "";
+            let showSubordinates = false;
+
+            // Configurar Header Modal
+            document.getElementById('pm-header').className = `px-6 py-4 flex justify-between items-center text-white transition-colors ${min.color}`;
+            document.getElementById('pm-icon').innerHTML = `<i class="fas ${min.icono}"></i>`;
+            document.getElementById('pm-ministry-name').innerHTML = `<span class="cursor-pointer hover:underline" onclick="closeProfileModal(); setTimeout(() => openSummaryModal(event, ${min.id}), 300);">${min.nombre}</span> <i class="fas fa-external-link-alt text-[10px] ml-1 opacity-70"></i>`;
+            document.getElementById('pm-role').className = `text-xs font-bold ${min.textColor} ${min.bgLight} px-3 py-1.5 rounded-lg uppercase tracking-widest text-center mb-5 border border-slate-200`;
+
+            const presiCard = buildHierarchyCard("Estado Plurinacional de Bolivia", "Rodrigo Paz Pereira", "Presidente del Estado", "https://upload.wikimedia.org/wikipedia/commons/9/9c/Presidente_Rodrigo_Paz_Pereira.jpg", "", "bg-slate-50 hover:bg-slate-100", "", "");
+            const minCard = buildHierarchyCard(min.nombre, min.autoridad, "Ministro/a de Estado", min.foto, min.contacto, "bg-white hover:bg-slate-50 cursor-pointer transition-colors", "", `onclick="openProfileModal(event, 'ministerio', ${min.id})"`);
+
+            if (type === 'ministerio') {
+                targetName = min.nombre; targetAuth = min.autoridad; targetRole = "Ministro/a de Estado"; targetContact = min.contacto; targetPhoto = min.foto;
+                superiorHTML = presiCard;
+                currentHTML = buildHierarchyCard(targetName, targetAuth, targetRole, targetPhoto, targetContact, "bg-slate-800 text-white border-slate-700", "ring-2 ring-slate-400/50", "");
+                
+                let subs = [];
+                min.viceministerios.forEach(v => {
+                    subs.push(buildHierarchyCard(v.nombre, v.autoridad, "Viceministro/a", v.foto, v.contacto, "bg-white hover:bg-slate-50 cursor-pointer transition-colors", "", `onclick="openProfileModal(event, 'viceministerio', ${min.id}, '${v.id}')"`));
+                });
+                if(min.extra) {
+                    min.extra.forEach(e => {
+                        subs.push(buildHierarchyCard(e.nombre, e.autoridad, "Director/a General (Extra)", e.foto, e.contacto, "bg-amber-50 hover:bg-amber-100 cursor-pointer transition-colors", "", `onclick="openProfileModal(event, 'extra', ${min.id}, null, '${e.id}')"`));
+                    });
+                }
+                if(min.estructuraComun) {
+                    min.estructuraComun.forEach(c => {
+                        subs.push(buildHierarchyCard(c.nombre, c.autoridad, "Director/a (Común)", c.foto, c.contacto, "bg-slate-100 hover:bg-slate-200 cursor-pointer transition-colors", "", `onclick="openProfileModal(event, 'comun', ${min.id}, null, '${c.id}')"`));
+                    });
+                }
+                if(min.entidades) {
+                    min.entidades.forEach(e => {
+                        subs.push(buildHierarchyCard(e.nombre, e.autoridad, e.tipo || "Director/a Ejecutivo", e.foto, e.contacto, "bg-emerald-50 hover:bg-emerald-100 cursor-pointer transition-colors", "", `onclick="openProfileModal(event, 'entidad', ${min.id}, null, '${e.id}')"`));
+                    });
+                }
+                subordinatesHTML = subs.join('');
+                showSubordinates = subs.length > 0;
+            } 
+            else if (type === 'viceministerio') {
+                const vice = min.viceministerios.find(v => v.id === viceId);
+                targetName = vice.nombre; targetAuth = vice.autoridad; targetRole = "Viceministro/a"; targetContact = vice.contacto; targetPhoto = vice.foto;
+                
+                superiorHTML = minCard;
+                currentHTML = buildHierarchyCard(targetName, targetAuth, targetRole, targetPhoto, targetContact, "bg-slate-800 text-white border-slate-700", "ring-2 ring-slate-400/50", "");
+                
+                let subs = vice.direcciones.map(d => 
+                    buildHierarchyCard(d.nombre, d.autoridad, "Director/a General", d.foto, d.contacto, "bg-white hover:bg-slate-50 cursor-pointer transition-colors", "", `onclick="openProfileModal(event, 'direccion', ${min.id}, '${vice.id}', '${d.id}')"`)
+                );
+                subordinatesHTML = subs.join('');
+                showSubordinates = subs.length > 0;
+            }
+            else if (type === 'direccion') {
+                const vice = min.viceministerios.find(v => v.id === viceId);
+                const dir = vice.direcciones.find(d => d.id === dirId);
+                targetName = dir.nombre; targetAuth = dir.autoridad; targetRole = "Director/a General"; targetContact = dir.contacto; targetPhoto = dir.foto;
+                
+                superiorHTML = buildHierarchyCard(vice.nombre, vice.autoridad, "Viceministro/a", vice.foto, vice.contacto, "bg-white hover:bg-slate-50 cursor-pointer transition-colors", "", `onclick="openProfileModal(event, 'viceministerio', ${min.id}, '${vice.id}')"`);
+                currentHTML = buildHierarchyCard(targetName, targetAuth, targetRole, targetPhoto, targetContact, "bg-slate-800 text-white border-slate-700", "ring-2 ring-slate-400/50", "");
+                showSubordinates = false;
+            }
+            else if (['comun', 'extra', 'entidad'].includes(type)) {
+                let arr = [];
+                let rolePre = "";
+                if(type === 'comun') { arr = min.estructuraComun; rolePre = "Director/a o Jefe/a (Común)"; }
+                else if (type === 'extra') { arr = min.extra; rolePre = "Director/a General (Extra)"; }
+                else { arr = min.entidades; rolePre = "Autoridad Entidad/Empresa"; }
+
+                const item = arr.find(c => c.id === dirId);
+                targetName = item.nombre; targetAuth = item.autoridad; targetRole = item.tipo ? item.tipo : rolePre; targetContact = item.contacto; targetPhoto = item.foto;
+                
+                superiorHTML = minCard;
+                currentHTML = buildHierarchyCard(targetName, targetAuth, targetRole, targetPhoto, targetContact, "bg-slate-800 text-white border-slate-700", "ring-2 ring-slate-400/50", "");
+                showSubordinates = false;
+            }
+
+            // Llenar Datos Principales
+            document.getElementById('pm-photo').innerHTML = getAvatarImg(targetAuth, targetPhoto, 'w-32 h-32 ring-4 ring-white shadow-xl');
+            document.getElementById('pm-name').innerHTML = targetAuth;
+            document.getElementById('pm-role').innerText = `${targetRole} - ${targetName}`;
+            document.getElementById('pm-contact').innerHTML = `<i class="fas fa-envelope mr-2 text-slate-400"></i>${targetContact}`;
+
+            // Llenar Jerarquía
+            document.getElementById('pm-superior').innerHTML = superiorHTML;
+            document.getElementById('pm-current').innerHTML = currentHTML;
+            const subCont = document.getElementById('pm-subordinates-container');
+            const subArrow = document.getElementById('pm-subordinates-arrow');
+            if(showSubordinates) {
+                document.getElementById('pm-subordinates').innerHTML = subordinatesHTML;
+                subCont.classList.remove('hidden');
+                subArrow.classList.remove('hidden');
+            } else {
+                subCont.classList.add('hidden');
+                subArrow.classList.add('hidden');
+            }
+
+            // Mostrar Modal
+            const modal = document.getElementById('perfil-modal');
+            const content = document.getElementById('perfil-modal-content');
+            modal.classList.remove('hidden');
+            void modal.offsetWidth; // Forzar reflow
+            modal.classList.remove('opacity-0');
+            content.classList.remove('scale-95');
+            content.classList.add('scale-100');
+        }
+
+        function closeProfileModal() {
+            const modal = document.getElementById('perfil-modal');
+            const content = document.getElementById('perfil-modal-content');
+            modal.classList.add('opacity-0');
+            content.classList.remove('scale-100');
+            content.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
+        }
+
+        document.getElementById('perfil-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeProfileModal();
+        });
+
+
+        // ------------------ MODAL RESUMEN MINISTERIO ------------------
+        function openSummaryModal(event, minId) {
+            if(event) { event.stopPropagation(); event.preventDefault(); }
+            const min = ministerios.find(m => m.id == minId);
+            if(!min) return;
+
+            // Header
+            document.getElementById('sm-header').className = `px-6 py-4 flex justify-between items-center text-white transition-colors ${min.color}`;
+            document.getElementById('sm-icon').innerHTML = `<i class="fas ${min.icono}"></i>`;
+            
+            // Perfil Ministro
+            document.getElementById('sm-photo').innerHTML = `<div class="cursor-pointer transition-transform hover:scale-105" onclick="closeSummaryModal(); setTimeout(() => openProfileModal(event, 'ministerio', ${min.id}), 300);">${getAvatarImg(min.autoridad, min.foto, 'w-24 h-24 ring-4 ring-slate-50 shadow-md')}</div>`;
+            document.getElementById('sm-ministry-name').innerHTML = `<span class="cursor-pointer hover:underline hover:text-blue-600 transition-colors" onclick="closeSummaryModal(); setTimeout(() => openProfileModal(event, 'ministerio', ${min.id}), 300);">${min.nombre}</span>`;
+            document.getElementById('sm-name').innerText = min.autoridad;
+            document.getElementById('sm-contact').innerHTML = `<i class="fas fa-envelope mr-1.5 text-slate-400"></i>${min.contacto}`;
+
+            // KPIs
+            const numVices = min.viceministerios.length;
+            const numDirs = min.viceministerios.reduce((acc, v) => acc + v.direcciones.length, 0);
+            const numExtras = (min.extra ? min.extra.length : 0) + (min.entidades ? min.entidades.length : 0);
+            const totalAreas = numVices + numDirs + numExtras + (min.estructuraComun ? min.estructuraComun.length : 0) + 1;
+            
+            document.getElementById('sm-stat-vices').innerText = numVices;
+            document.getElementById('sm-stat-dirs').innerText = numDirs;
+            document.getElementById('sm-stat-extras').innerText = min.entidades ? min.entidades.length : 0;
+            document.getElementById('sm-stat-total').innerText = totalAreas;
+
+            // Listas
+            const listVices = document.getElementById('sm-list-vices');
+            listVices.innerHTML = min.viceministerios.map(v => 
+                `<li class="flex items-start gap-2 cursor-pointer hover:text-blue-600 transition-colors group p-1 -ml-1 rounded hover:bg-blue-50/50" onclick="closeSummaryModal(); setTimeout(() => openProfileModal(event, 'viceministerio', ${min.id}, '${v.id}'), 300);">
+                    <i class="fas fa-check-circle text-blue-400 mt-0.5 shrink-0 group-hover:text-blue-600"></i> 
+                    <span class="underline-offset-2 group-hover:underline">${highlightText(v.nombre, "")}</span>
+                </li>`
+            ).join('');
+            
+            const listExtras = document.getElementById('sm-list-extras');
+            const allExtrasAndComun = [
+                ...(min.extra || []).map(x => ({...x, type: 'extra'})),
+                ...(min.estructuraComun || []).map(x => ({...x, type: 'comun'}))
+            ];
+            listExtras.innerHTML = allExtrasAndComun.map(e => 
+                `<li class="flex items-start gap-2 cursor-pointer hover:text-amber-700 transition-colors group p-1 -ml-1 rounded hover:bg-amber-50/50" onclick="closeSummaryModal(); setTimeout(() => openProfileModal(event, '${e.type}', ${min.id}, null, '${e.id}'), 300);">
+                    <i class="fas ${e.type === 'extra' ? 'fa-star text-amber-400 group-hover:text-amber-500' : 'fa-circle text-slate-400 group-hover:text-slate-500'} mt-0.5 shrink-0 text-[10px]"></i> 
+                    <span class="underline-offset-2 group-hover:underline text-slate-600 group-hover:text-amber-700">${highlightText(e.nombre, "")}</span>
+                </li>`
+            ).join('');
+
+            const listEntidades = document.getElementById('sm-list-entidades');
+            const entidadesContainer = document.getElementById('sm-list-entidades-container');
+            if (min.entidades && min.entidades.length > 0) {
+                entidadesContainer.classList.remove('hidden');
+                listEntidades.innerHTML = min.entidades.map(ent => 
+                    `<li class="flex items-start gap-2 cursor-pointer hover:text-emerald-700 transition-colors group p-1 -ml-1 rounded hover:bg-emerald-50/50" onclick="closeSummaryModal(); setTimeout(() => openProfileModal(event, 'entidad', ${min.id}, null, '${ent.id}'), 300);">
+                        <i class="fas fa-building text-emerald-400 group-hover:text-emerald-500 mt-0.5 shrink-0 text-[10px]"></i> 
+                        <span class="underline-offset-2 group-hover:underline">${highlightText(ent.nombre, "")}</span>
+                    </li>`
+                ).join('');
+            } else {
+                entidadesContainer.classList.add('hidden');
+            }
+
+            // Mostrar Modal
+            const modal = document.getElementById('summary-modal');
+            const content = document.getElementById('summary-modal-content');
+            modal.classList.remove('hidden');
+            void modal.offsetWidth; // Forzar reflow
+            modal.classList.remove('opacity-0');
+            content.classList.remove('scale-95');
+            content.classList.add('scale-100');
+        }
+
+        function closeSummaryModal() {
+            const modal = document.getElementById('summary-modal');
+            const content = document.getElementById('summary-modal-content');
+            modal.classList.add('opacity-0');
+            content.classList.remove('scale-100');
+            content.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
+        }
+        
+        document.getElementById('summary-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeSummaryModal();
+        });
+
+
+        // ------------------ RENDER UI ------------------
+        function renderCards(data, term = '') {
+            const grid = document.getElementById('ministries-grid');
+            grid.innerHTML = '';
+
+            if(data.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-500 bg-white rounded-2xl border border-slate-200">
+                    <i class="fas fa-search text-4xl mb-4 opacity-50"></i>
+                    <p class="text-lg font-medium text-slate-600">No se encontraron resultados para la búsqueda.</p>
+                </div>`;
                 return;
             }
 
             data.forEach(min => {
-                const isExpanded = expandedAccordionId === min.id || searchTerm !== '';
                 const card = document.createElement('div');
-                card.className = 'bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden';
+                card.className = 'bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden ministry-card flex flex-col h-full relative';
                 
-                const header = document.createElement('button');
-                header.className = 'w-full px-6 py-5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors focus:outline-none';
-                header.onclick = () => {
-                    expandedAccordionId = isExpanded ? null : min.id;
-                    if(searchTerm) { searchTerm = ''; searchInput.value = ''; updateSearchUI(); }
-                    renderData();
-                };
-
-                header.innerHTML = `
-                    <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center flex-shrink-0">
-                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                let vicesHTML = min.viceministerios.map(v => `
+                    <details class="group bg-white rounded-xl border border-slate-100 mb-3 overflow-hidden shadow-sm" ${term.length>0 ? 'open' : ''}>
+                        <summary class="flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100 transition cursor-pointer">
+                            <div class="flex flex-col pr-2 w-full">
+                                <div class="flex items-start gap-2.5">
+                                    <i class="fas fa-sitemap text-[10px] mt-1 text-slate-400 shrink-0"></i>
+                                    <span class="text-sm text-slate-800 font-bold leading-tight">${highlightText(v.nombre, term)}</span>
+                                </div>
+                                <div class="flex items-center gap-2 mt-2 ml-5 text-[11px] font-medium text-slate-500 w-full overflow-hidden group/vice cursor-pointer hover:bg-slate-200/50 p-1 -ml-1 rounded transition-colors" onclick="openProfileModal(event, 'viceministerio', ${min.id}, '${v.id}')" title="Ver Perfil">
+                                    ${getAvatarImg(v.autoridad, v.foto, 'w-8 h-8')}
+                                    <div class="flex flex-col flex-1 overflow-hidden">
+                                        <span class="truncate text-slate-700 group-hover/vice:text-blue-600 transition-colors">${highlightText(v.autoridad, term)}</span>
+                                        <span class="truncate text-[9px]"><i class="fas fa-envelope text-slate-400 mr-1"></i>${v.contacto}</span>
+                                    </div>
+                                    <i class="fas fa-id-badge text-slate-300 group-hover/vice:text-blue-500 opacity-0 group-hover/vice:opacity-100 transition-opacity pr-2"></i>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-right text-xs text-slate-400 transition-transform duration-200 group-open:rotate-90 shrink-0"></i>
+                        </summary>
+                        <div class="p-3.5 bg-white border-t border-slate-100">
+                            <ul class="space-y-2">
+                                ${v.direcciones.map(d => `
+                                    <li class="flex flex-col pl-2 hover:bg-slate-50 p-2 rounded-lg transition-colors cursor-pointer group/dir" onclick="openProfileModal(event, 'direccion', ${min.id}, '${v.id}', '${d.id}')" title="Ver Perfil">
+                                        <div class="flex items-start gap-2">
+                                            <i class="fas fa-circle text-[6px] mt-1.5 text-slate-300 shrink-0 group-hover/dir:text-blue-400 transition-colors"></i>
+                                            <span class="text-xs text-slate-700 font-semibold leading-tight group-hover/dir:text-blue-700 transition-colors">${highlightText(d.nombre, term)}</span>
+                                        </div>
+                                        <div class="pl-4 mt-1.5 text-[10px] text-slate-500 font-medium flex items-center gap-2">
+                                            ${getAvatarImg(d.autoridad, d.foto, 'w-7 h-7')}
+                                            <div class="flex flex-col flex-1 overflow-hidden">
+                                                <span class="truncate group-hover/dir:text-slate-800 transition-colors">${highlightText(d.autoridad, term)}</span>
+                                                <span class="truncate"><i class="fas fa-phone text-slate-300 mr-1"></i>${d.contacto}</span>
+                                            </div>
+                                        </div>
+                                    </li>
+                                `).join('')}
+                            </ul>
                         </div>
-                        <h2 class="text-lg md:text-xl font-bold text-slate-800">${min.name}</h2>
-                    </div>
-                    <svg class="w-6 h-6 text-slate-400 chevron ${isExpanded ? 'rotated' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                `;
+                    </details>
+                `).join('');
 
-                const content = document.createElement('div');
-                content.className = `border-t border-slate-100 accordion-content ${isExpanded ? 'active' : ''}`;
-                
-                if (isExpanded) {
-                    content.innerHTML = viewMode === 'list' ? renderListView(min) : renderChartView(min);
+                let comunHTML = '';
+                const allExtrasAndComun = [
+                    ...(min.extra || []).map(x => ({...x, type: 'extra'})),
+                    ...(min.estructuraComun || []).map(x => ({...x, type: 'comun'})),
+                    ...(min.entidades || []).map(x => ({...x, type: 'entidad'}))
+                ];
+
+                if (allExtrasAndComun.length > 0) {
+                    comunHTML = `
+                        <details class="group bg-slate-50 rounded-xl border border-slate-200 mb-3 overflow-hidden shadow-sm" ${term.length>0 ? 'open' : ''}>
+                            <summary class="flex items-center justify-between p-3.5 bg-slate-100 hover:bg-slate-200/50 transition cursor-pointer">
+                                <div class="flex items-center gap-2.5">
+                                    <i class="fas fa-layer-group text-[10px] text-slate-500 shrink-0"></i>
+                                    <span class="text-xs text-slate-700 font-bold leading-tight uppercase tracking-wider">Estructura Transversal y Entidades</span>
+                                </div>
+                                <i class="fas fa-chevron-right text-xs text-slate-400 transition-transform duration-200 group-open:rotate-90 shrink-0"></i>
+                            </summary>
+                            <div class="p-3.5 bg-white border-t border-slate-200">
+                                <ul class="space-y-2">
+                                    ${allExtrasAndComun.map(item => `
+                                        <li class="flex flex-col pl-2 hover:bg-slate-50 p-2 rounded-lg transition-colors cursor-pointer group/dir" onclick="openProfileModal(event, '${item.type}', ${min.id}, null, '${item.id}')" title="Ver Perfil">
+                                            <div class="flex items-start gap-2">
+                                                <i class="fas ${item.type === 'extra' ? 'fa-star text-amber-400' : (item.type === 'entidad' ? 'fa-building text-emerald-500' : 'fa-circle text-slate-300')} text-[8px] mt-1.5 shrink-0 transition-colors"></i>
+                                                <span class="text-xs text-slate-700 font-semibold leading-tight ${item.type === 'extra' ? 'group-hover/dir:text-amber-700' : (item.type==='entidad' ? 'group-hover/dir:text-emerald-700':'group-hover/dir:text-slate-800')} transition-colors block">${highlightText(item.nombre, term)} ${item.type === 'entidad' ? `<span class="ml-1 text-[8px] bg-emerald-100 text-emerald-700 px-1 rounded-sm uppercase tracking-widest font-bold">${item.tipo}</span>` : ''}</span>
+                                            </div>
+                                            <div class="pl-4 mt-1.5 text-[10px] text-slate-500 font-medium flex items-center gap-2">
+                                                ${getAvatarImg(item.autoridad, item.foto, 'w-7 h-7')}
+                                                <div class="flex flex-col flex-1 overflow-hidden">
+                                                    <span class="truncate font-bold group-hover/dir:text-slate-800 transition-colors">${highlightText(item.autoridad, term)}</span>
+                                                    <span class="truncate"><i class="fas fa-phone text-slate-300 mr-1"></i>${item.contacto}</span>
+                                                </div>
+                                            </div>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                        </details>
+                    `;
                 }
 
-                card.appendChild(header);
-                card.appendChild(content);
-                container.appendChild(card);
+                card.innerHTML = `
+                    <div class="absolute top-4 right-4 flex gap-2 z-20">
+                        <button onclick="openSummaryModal(event, ${min.id})" class="w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-600 flex items-center justify-center transition-all shadow-sm backdrop-blur-sm" title="Ver Resumen del Ministerio">
+                            <i class="fas fa-chart-bar"></i>
+                        </button>
+                        <button onclick="openProfileModal(event, 'ministerio', ${min.id})" class="w-8 h-8 rounded-full bg-white/50 hover:bg-white border border-slate-200/50 hover:border-slate-300 text-slate-500 hover:text-blue-600 flex items-center justify-center transition-all shadow-sm backdrop-blur-sm" title="Ver Perfil Jerárquico">
+                            <i class="fas fa-id-card"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="p-6 flex flex-col gap-4 border-b border-slate-100 bg-white z-10 relative">
+                        <div class="flex items-start pr-16 gap-4">
+                            <div class="w-14 h-14 rounded-2xl ${min.bgLight} ${min.textColor} border border-slate-100 shadow-sm flex items-center justify-center text-2xl shrink-0 mt-1">
+                                <i class="fas ${min.icono}"></i>
+                            </div>
+                            <h3 class="font-black text-slate-800 text-lg leading-tight mt-0.5 cursor-pointer hover:text-blue-600 transition-colors" onclick="openSummaryModal(event, ${min.id})">${highlightText(min.nombre, term)}</h3>
+                        </div>
+                        <div class="text-[11px] text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 shadow-inner flex items-center gap-3 cursor-pointer hover:bg-slate-100 transition-colors group/min" onclick="openProfileModal(event, 'ministerio', ${min.id})" title="Ver Perfil">
+                            ${getAvatarImg(min.autoridad, min.foto, 'w-12 h-12')}
+                            <div class="flex-1 overflow-hidden">
+                                <div class="mb-1.5 truncate"><strong class="text-slate-800 text-sm group-hover/min:text-blue-700 transition-colors">${highlightText(min.autoridad, term)}</strong></div>
+                                <div class="truncate"><i class="fas fa-envelope text-slate-400 mr-1"></i> ${min.contacto}</div>
+                            </div>
+                            <i class="fas fa-chevron-right text-slate-300 group-hover/min:text-blue-500 transition-colors"></i>
+                        </div>
+                    </div>
+                    <div class="p-5 flex-1 bg-slate-50/50">
+                        ${vicesHTML}
+                        ${comunHTML}
+                    </div>
+                `;
+                grid.appendChild(card);
             });
-        };
+            actualizarKPIs(data);
+        }
 
-        const renderModifications = () => {
-            modsContainer.innerHTML = modificacionesData.map(mod => `
-                <div class="bg-slate-50 p-5 rounded-xl border border-slate-200">
-                    <h4 class="font-bold text-slate-800 text-xs uppercase tracking-wider mb-4">${mod.title}</h4>
-                    <ul class="space-y-3">
-                        ${mod.items.map(item => `
-                            <li class="text-sm text-slate-600 flex items-start gap-2">
-                                <span class="text-blue-500 font-bold mt-0.5">•</span>
-                                <span class="leading-snug">${item}</span>
-                            </li>
-                        `).join('')}
-                    </ul>
+        function renderOrgTree(data, term = '') {
+            const treeContainer = document.getElementById('org-interactive-tree');
+            treeContainer.innerHTML = '';
+            
+            if(data.length === 0) {
+                treeContainer.innerHTML = `<p class="text-slate-500 font-medium p-4">No hay datos para mostrar.</p>`;
+                return;
+            }
+
+            let html = `
+            <div class="mb-6">
+                <div class="inline-flex items-center gap-3 bg-[#1b4332] text-white px-6 py-3.5 rounded-2xl shadow-md border border-[#2d6a4f] z-10 relative">
+                    <i class="fas fa-landmark text-xl text-amber-400"></i>
+                    <span class="font-black text-lg">Presidencia del Estado Plurinacional</span>
                 </div>
-            `).join('');
-        };
+                <div class="ml-8 pl-8 border-l-2 border-slate-200 mt-3 space-y-5 pt-3">
+            `;
 
-        const updateViewButtons = () => {
-            const activeClass = "px-5 py-2 text-sm font-semibold rounded-md transition-all shadow-sm bg-white text-blue-700 ring-1 ring-slate-200/50";
-            const inactiveClass = "px-5 py-2 text-sm font-semibold rounded-md transition-all text-slate-600 hover:text-slate-900";
-            btnViewList.className = viewMode === 'list' ? activeClass : inactiveClass;
-            btnViewChart.className = viewMode === 'chart' ? activeClass : inactiveClass;
-            renderData();
-        };
+            data.forEach(min => {
+                html += `
+                    <details class="group min-details" ${term.length>0 ? 'open' : ''}>
+                        <summary class="inline-flex items-center gap-3 bg-white border border-slate-200 pl-2 pr-5 py-2 rounded-xl shadow-sm hover:border-slate-300 transition relative z-10 cursor-pointer">
+                            <div class="w-10 h-10 rounded-lg ${min.bgLight} ${min.textColor} flex items-center justify-center shrink-0 shadow-sm border border-white">
+                                <i class="fas ${min.icono} text-base"></i>
+                            </div>
+                            <div class="flex flex-col pr-2">
+                                <span class="font-black text-slate-800">${highlightText(min.nombre, term)}</span>
+                                <div class="flex items-center gap-2 mt-1.5 hover:bg-slate-100 p-1 -ml-1 rounded transition-colors group/auth" onclick="openProfileModal(event, 'ministerio', ${min.id})" title="Ver Perfil">
+                                    ${getAvatarImg(min.autoridad, min.foto, 'w-6 h-6')}
+                                    <span class="text-[11px] text-slate-500 font-medium group-hover/auth:text-blue-600 transition-colors">
+                                        <span class="font-bold">${highlightText(min.autoridad, term)}</span> 
+                                        <span class="mx-2 text-slate-300">|</span> 
+                                        <i class="fas fa-envelope mr-1.5 text-slate-400"></i>${min.contacto}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="ml-4 flex items-center gap-2">
+                                <button onclick="openProfileModal(event, 'ministerio', ${min.id})" class="text-slate-300 hover:text-blue-600 p-1.5 rounded transition-colors" title="Ver Perfil Jerárquico"><i class="fas fa-id-card"></i></button>
+                                <i class="fas fa-chevron-right text-xs text-slate-400 transition-transform duration-200 group-open:rotate-90"></i>
+                            </div>
+                        </summary>
+                        
+                        <div class="ml-5 pl-10 border-l-2 border-slate-200 mt-3 space-y-4 pt-2 pb-3">
+                `;
+                
+                min.viceministerios.forEach(vice => {
+                    html += `
+                        <details class="group/vice vice-details" ${term.length>0 ? 'open' : ''}>
+                            <summary class="inline-flex flex-col items-start bg-slate-50 border border-slate-200 pl-4 pr-3 py-2.5 rounded-xl hover:bg-slate-100 shadow-sm transition relative z-10 cursor-pointer">
+                                <div class="flex items-center gap-2 w-full justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-sitemap text-slate-400 text-sm shrink-0"></i>
+                                        <span class="font-bold text-slate-700 text-sm pr-2">${highlightText(vice.nombre, term)}</span>
+                                    </div>
+                                    <div class="flex items-center gap-1">
+                                        <button onclick="openProfileModal(event, 'viceministerio', ${min.id}, '${vice.id}')" class="text-slate-300 hover:text-blue-600 p-1 rounded transition-colors" title="Ver Perfil"><i class="fas fa-id-badge"></i></button>
+                                        <i class="fas fa-chevron-right text-[10px] text-slate-400 transition-transform duration-200 group-open/vice:rotate-90 ml-1"></i>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 pl-6 mt-1.5 hover:bg-slate-200/50 p-1 -ml-1 rounded transition-colors group/auth" onclick="openProfileModal(event, 'viceministerio', ${min.id}, '${vice.id}')">
+                                    ${getAvatarImg(vice.autoridad, vice.foto, 'w-6 h-6')}
+                                    <div class="text-[11px] text-slate-500 font-medium group-hover/auth:text-blue-600 transition-colors">
+                                        <span class="font-bold">${highlightText(vice.autoridad, term)}</span> 
+                                        <span class="mx-1 text-slate-300">&bull;</span> 
+                                        <i class="fas fa-envelope text-slate-400 mr-1"></i>${vice.contacto}
+                                    </div>
+                                </div>
+                            </summary>
+                            
+                            <div class="ml-3 pl-8 border-l-2 border-slate-200 mt-2 space-y-2.5 pt-2 pb-2">
+                                ${vice.direcciones.map(dir => `
+                                    <div class="flex items-start gap-2 relative z-10 group/dir cursor-pointer" onclick="openProfileModal(event, 'direccion', ${min.id}, '${vice.id}', '${dir.id}')">
+                                        <div class="w-4 h-[2px] bg-slate-200 mt-3 group-hover/dir:bg-blue-300 transition-colors"></div>
+                                        <div class="bg-white border border-slate-200 px-3 py-2 rounded-lg text-xs shadow-sm whitespace-normal max-w-sm group-hover/dir:border-blue-300 group-hover/dir:shadow-md transition-all">
+                                            <div class="font-bold text-slate-700 mb-1.5 group-hover/dir:text-blue-700 transition-colors">${highlightText(dir.nombre, term)}</div>
+                                            <div class="flex items-center gap-2 mt-1">
+                                                ${getAvatarImg(dir.autoridad, dir.foto, 'w-6 h-6')}
+                                                <div class="text-[10px] text-slate-500 leading-tight font-medium">
+                                                    <span class="block mb-0.5 font-bold group-hover/dir:text-slate-800 transition-colors">${highlightText(dir.autoridad, term)}</span>
+                                                    <i class="fas fa-phone mr-1 text-slate-300"></i>${dir.contacto}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </details>
+                    `;
+                });
 
-        const updateSearchUI = () => {
-            btnClear.classList.toggle('hidden', !searchTerm);
-        };
+                if(min.extra && min.extra.length > 0) {
+                    min.extra.forEach(ext => {
+                        html += `
+                            <div class="inline-flex flex-col items-start gap-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-4 py-2.5 rounded-xl shadow-sm relative z-10 cursor-pointer transition-colors group/ext" onclick="openProfileModal(event, 'extra', ${min.id}, null, '${ext.id}')">
+                                <div class="flex items-center gap-2 mb-1 justify-between w-full">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-star text-amber-500 text-sm shrink-0"></i>
+                                        <span class="font-bold text-slate-800 text-xs">${highlightText(ext.nombre, term)} <span class="text-amber-700/70 ml-1 font-medium">(Dep. Directa)</span></span>
+                                    </div>
+                                    <i class="fas fa-id-badge text-amber-300 group-hover/ext:text-amber-600 transition-colors ml-2"></i>
+                                </div>
+                                <div class="flex items-center gap-2 pl-6 mt-1 border-t border-amber-200/50 pt-2 w-full">
+                                    ${getAvatarImg(ext.autoridad, ext.foto, 'w-6 h-6')}
+                                    <div class="text-[10px] text-slate-700 font-bold group-hover/ext:text-amber-900 transition-colors">${highlightText(ext.autoridad, term)}</div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
 
-        // --- STREAMING_CHUNK:Asignando Eventos... ---
-        btnViewList.addEventListener('click', () => { viewMode = 'list'; updateViewButtons(); });
-        btnViewChart.addEventListener('click', () => { viewMode = 'chart'; updateViewButtons(); });
+                if(min.estructuraComun && min.estructuraComun.length > 0) {
+                    html += `
+                    <details class="group/comun vice-details mt-2" ${term.length>0 ? 'open' : ''}>
+                        <summary class="inline-flex items-center gap-2 bg-slate-200 text-slate-700 border border-slate-300 pl-4 pr-3 py-2 rounded-xl hover:bg-slate-300/50 shadow-sm transition relative z-10 cursor-pointer">
+                            <i class="fas fa-layer-group text-slate-500 text-sm shrink-0"></i>
+                            <span class="font-bold text-xs uppercase tracking-wider pr-2">Estructura Común (Art. 95)</span>
+                            <i class="fas fa-chevron-right text-[10px] text-slate-500 transition-transform duration-200 group-open/comun:rotate-90 ml-1"></i>
+                        </summary>
+                        <div class="ml-3 pl-8 border-l-2 border-slate-300 mt-2 space-y-2.5 pt-2 pb-2">
+                            ${min.estructuraComun.map(c => `
+                                <div class="flex items-start gap-2 relative z-10 group/dir cursor-pointer" onclick="openProfileModal(event, 'comun', ${min.id}, null, '${c.id}')">
+                                    <div class="w-4 h-[2px] bg-slate-300 mt-3 group-hover/dir:bg-slate-400 transition-colors"></div>
+                                    <div class="bg-white border border-slate-200 px-3 py-2 rounded-lg text-xs shadow-sm whitespace-normal max-w-sm group-hover/dir:border-slate-400 group-hover/dir:shadow-md transition-all">
+                                        <div class="font-bold text-slate-600 mb-1.5 group-hover/dir:text-slate-800 transition-colors">${highlightText(c.nombre, term)}</div>
+                                        <div class="flex items-center gap-2 mt-1">
+                                            ${getAvatarImg(c.autoridad, c.foto, 'w-5 h-5')}
+                                            <div class="text-[10px] text-slate-500 leading-tight font-medium">
+                                                <span class="block mb-0.5 font-bold group-hover/dir:text-slate-700 transition-colors">${highlightText(c.autoridad, term)}</span>
+                                                <i class="fas fa-phone mr-1 text-slate-300"></i>${c.contacto}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </details>`;
+                }
+                
+                html += `
+                        </div>
+                    </details>
+                `;
+            });
+
+            html += `
+                </div>
+            </div>`;
+            
+            treeContainer.innerHTML = html;
+        }
+
+        // ------------------ RENDER RESUMEN ALTA GERENCIA ------------------
+        function renderResumen(data, term = '') {
+            const container = document.getElementById('resumen-container');
+            if(!container) return;
+            container.innerHTML = '';
+
+            if(data.length === 0) {
+                container.innerHTML = `<div class="text-center py-10 text-slate-500 font-medium">No se encontraron resultados para la búsqueda.</div>`;
+                return;
+            }
+
+            let html = '';
+            data.forEach(min => {
+                let vicesHTML = min.viceministerios.map(v => `
+                    <div class="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 shadow-sm hover:shadow-md hover:border-blue-300 transition-all cursor-pointer" onclick="openProfileModal(event, 'viceministerio', ${min.id}, '${v.id}')" title="Ver Perfil de Viceministro/a">
+                        ${getAvatarImg(v.autoridad, v.foto, 'w-16 h-16')}
+                        <div class="flex-1 overflow-hidden">
+                            <h4 class="text-xs font-black text-slate-500 uppercase tracking-widest leading-tight mb-1 truncate" title="${v.nombre}">${highlightText(v.nombre, term)}</h4>
+                            <p class="text-base font-bold text-slate-800 truncate">${highlightText(v.autoridad, term)}</p>
+                            <p class="text-[10px] text-slate-400 mt-1 truncate"><i class="fas fa-envelope mr-1"></i>${v.contacto}</p>
+                        </div>
+                    </div>
+                `).join('');
+
+                html += `
+                <details class="group resumen-details bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm" ${term.length>0 ? 'open' : ''}>
+                    <summary class="flex flex-col sm:flex-row sm:items-center justify-between p-5 hover:bg-slate-50 transition cursor-pointer gap-4">
+                        <div class="flex items-center gap-5 overflow-hidden">
+                            ${getAvatarImg(min.autoridad, min.foto, 'w-20 h-20 ring-4 ring-slate-100 shadow-md')}
+                            <div class="flex-1 overflow-hidden">
+                                <h3 class="text-lg font-black text-slate-800 truncate" title="${min.nombre}">${highlightText(min.nombre, term)}</h3>
+                                <div class="flex items-center gap-2 mt-1 flex-wrap">
+                                    <span class="text-sm font-bold ${min.textColor} bg-slate-100 px-2.5 py-0.5 rounded-md truncate">${highlightText(min.autoridad, term)}</span>
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest border border-slate-200 px-2 py-0.5 rounded-md">Ministro/a</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 shrink-0 pl-24 sm:pl-0">
+                            <span class="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg shadow-sm border border-slate-200">
+                                <i class="fas fa-sitemap mr-1 text-slate-400"></i> ${min.viceministerios.length} Viceministerios
+                            </span>
+                            <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                                <i class="fas fa-chevron-right text-slate-400 group-hover:text-blue-600 transition-transform duration-300 group-open:rotate-90"></i>
+                            </div>
+                        </div>
+                    </summary>
+                    <div class="p-6 pt-4 border-t border-slate-100 bg-slate-50/80">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${vicesHTML || '<div class="col-span-full text-xs text-slate-500 italic p-4 bg-white rounded-xl border border-slate-200">No hay viceministerios registrados en esta cartera.</div>'}
+                        </div>
+                    </div>
+                </details>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function toggleResumenTrees(openState) {
+            document.querySelectorAll('details.resumen-details').forEach(det => {
+                if (openState) {
+                    det.setAttribute('open', '');
+                } else {
+                    det.removeAttribute('open');
+                }
+            });
+        }
+
+        // ------------------ FUNCIONES COMPARTIDAS ------------------
         
-        searchInput.addEventListener('input', (e) => {
-            searchTerm = e.target.value;
-            updateSearchUI();
-            renderData();
+        function aplicarFiltro(term) {
+            let filtered = [];
+            if (!term || term.trim() === "") {
+                filtered = ministerios;
+            } else {
+                const lowerTerm = term.toLowerCase().trim();
+                
+                // Filtrado Profundo (Deep Filter)
+                filtered = ministerios.map(min => {
+                    const minMatch = min.nombre.toLowerCase().includes(lowerTerm) || min.autoridad.toLowerCase().includes(lowerTerm);
+                    
+                    // Filtrar extras (Direcciones bajo dependencia directa)
+                    const filteredExtras = (min.extra || []).filter(ext => 
+                        minMatch || ext.nombre.toLowerCase().includes(lowerTerm) || ext.autoridad.toLowerCase().includes(lowerTerm)
+                    );
+
+                    // Filtrar estructura común
+                    const filteredComun = (min.estructuraComun || []).filter(c => 
+                        minMatch || c.nombre.toLowerCase().includes(lowerTerm) || c.autoridad.toLowerCase().includes(lowerTerm)
+                    );
+                    
+                    // Filtrar entidades
+                    const filteredEntidades = (min.entidades || []).filter(ent => 
+                        minMatch || ent.nombre.toLowerCase().includes(lowerTerm) || ent.autoridad.toLowerCase().includes(lowerTerm) || ent.tipo.toLowerCase().includes(lowerTerm)
+                    );
+
+                    // Filtrar viceministerios y sus direcciones
+                    const filteredVices = min.viceministerios.map(vice => {
+                        const viceMatch = vice.nombre.toLowerCase().includes(lowerTerm) || vice.autoridad.toLowerCase().includes(lowerTerm);
+                        
+                        const filteredDirs = vice.direcciones.filter(dir => 
+                            minMatch || viceMatch || dir.nombre.toLowerCase().includes(lowerTerm) || dir.autoridad.toLowerCase().includes(lowerTerm)
+                        );
+                        
+                        if (minMatch || viceMatch || filteredDirs.length > 0) {
+                            return { ...vice, direcciones: filteredDirs };
+                        }
+                        return null;
+                    }).filter(v => v !== null);
+
+                    if (minMatch || filteredVices.length > 0 || filteredExtras.length > 0 || filteredComun.length > 0 || filteredEntidades.length > 0) {
+                        return { ...min, viceministerios: filteredVices, extra: filteredExtras, estructuraComun: filteredComun, entidades: filteredEntidades };
+                    }
+                    return null;
+                }).filter(m => m !== null);
+            }
+            
+            renderCards(filtered, term);
+            renderOrgTree(filtered, term);
+            renderResumen(filtered, term);
+
+            if(term.length > 0) {
+                setTimeout(() => {
+                    toggleAllTrees(true);
+                    toggleResumenTrees(true);
+                }, 100);
+            }
+        }
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            aplicarFiltro(e.target.value.toLowerCase());
         });
 
-        btnClear.addEventListener('click', () => {
-            searchTerm = '';
-            searchInput.value = '';
-            updateSearchUI();
-            renderData();
-        });
+        function toggleAllTrees(openState) {
+            document.querySelectorAll('details.min-details, details.vice-details').forEach(det => {
+                if (openState) {
+                    det.setAttribute('open', '');
+                } else {
+                    det.removeAttribute('open');
+                }
+            });
+        }
 
-        // Lógica para arrastrar el organigrama con el ratón (Drag to scroll)
-        let isDown = false;
-        let startX;
-        let scrollLeft;
-        let activeWrapper = null;
+        function switchMainTab(tabId) {
+            document.querySelectorAll('.main-tab').forEach(t => { 
+                t.classList.remove('active', 'border-blue-600', 'text-blue-600'); 
+                t.classList.add('border-transparent'); 
+                t.setAttribute('aria-selected', 'false'); 
+            });
+            const btn = document.getElementById(`tab-btn-${tabId}`);
+            if(btn) {
+                btn.classList.add('active'); 
+                btn.setAttribute('aria-selected', 'true');
+                btn.classList.add('border-blue-600', 'text-blue-600');
+            }
 
-        container.addEventListener('mousedown', (e) => {
-            const wrapper = e.target.closest('.org-chart-wrapper');
-            if (!wrapper) return;
-            isDown = true;
-            activeWrapper = wrapper;
-            startX = e.pageX - wrapper.offsetLeft;
-            scrollLeft = wrapper.scrollLeft;
-        });
+            document.querySelectorAll('.view-section').forEach(v => { 
+                v.classList.add('hidden'); 
+                v.classList.remove('block'); 
+            });
+            const view = document.getElementById(`view-${tabId}`);
+            if(view) { 
+                view.classList.remove('hidden'); 
+                view.classList.add('block'); 
+            }
+        }
 
-        container.addEventListener('mouseleave', () => { isDown = false; activeWrapper = null; });
-        container.addEventListener('mouseup', () => { isDown = false; activeWrapper = null; });
+        // ------------------ INITIALIZE ------------------
+        window.onload = async () => {
+            const loadingBanner = document.getElementById('loading-banner');
+            const loadingText = document.getElementById('loading-text');
+            
+            if(loadingBanner) {
+                loadingBanner.classList.remove('hidden');
+                loadingText.innerText = "Intentando sincronizar datos...";
+            }
 
-        container.addEventListener('mousemove', (e) => {
-            if (!isDown || !activeWrapper) return;
-            e.preventDefault();
-            const x = e.pageX - activeWrapper.offsetLeft;
-            const walk = (x - startX) * 1.5; // Velocidad de arrastre
-            activeWrapper.scrollLeft = scrollLeft - walk;
-        });
+            let dataLoaded = false;
 
-        // Init
-        renderModifications();
-        renderData();
+            // 1. Intentar sincronizar desde Google Sheets
+            if (GOOGLE_SHEET_ID !== 'TU_ID_DE_GOOGLE_SHEET_AQUI') {
+                loadingText.innerText = "Sincronizando desde Google Sheets...";
+                dataLoaded = await fetchFromGoogleSheets(false);
+            }
 
+            // 2. Si falla Google Sheets, intentar cargar archivo Excel local "ds5675.xlsx"
+            if (!dataLoaded) {
+                try {
+                    loadingText.innerText = "Buscando archivo local ds5675.xlsx...";
+                    const response = await fetch('ds5675.xlsx');
+                    if (response.ok) {
+                        const arrayBuffer = await response.arrayBuffer();
+                        const data = new Uint8Array(arrayBuffer);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const rows = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                        
+                        const datos = rows.slice(1);
+                        reconstruirDatos(datos); // Reutilizamos la función de importación
+                        dataLoaded = true;
+                    } else {
+                        console.warn("Archivo ds5675.xlsx no encontrado (HTTP " + response.status + ").");
+                    }
+                } catch (error) {
+                    console.warn("Error al intentar cargar ds5675.xlsx localmente:", error);
+                }
+            }
+
+            // 3. Si falla todo lo anterior, cargar datos base precargados
+            if (!dataLoaded) {
+                loadingText.innerText = "Cargando datos precargados (Fallback)...";
+                renderCards(ministerios);
+                renderOrgTree(ministerios);
+                renderResumen(ministerios);
+                actualizarKPIs(ministerios);
+            }
+
+            // Ocultar banner de carga
+            if(loadingBanner) {
+                loadingText.innerHTML = '<i class="fas fa-check"></i> ¡Datos cargados con éxito!';
+                setTimeout(() => loadingBanner.classList.add('hidden'), 1500);
+            }
+        };
     </script>
 </body>
 </html>
